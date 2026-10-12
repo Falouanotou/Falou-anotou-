@@ -2,14 +2,14 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path');
 const {configuration}=require('./server/config'),{SessionStore}=require('./server/session-store'),{AuthService,ApiError,guard}=require('./server/auth-service'),pages=require('./server/pages');
 function readJson(req,maximum=16384){return new Promise((resolve,reject)=>{if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||'')){reject(new ApiError(415,'Use uma solicitação JSON.'));req.resume();return;}let size=0,chunks=[],failed=false;req.on('data',chunk=>{size+=chunk.length;if(size>maximum){if(!failed)reject(new ApiError(413,'Arquivo/solicitação acima do limite.'));failed=true;chunks=[];}else if(!failed)chunks.push(chunk);});req.on('end',()=>{if(failed)return;try{const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!body||typeof body!=='object'||Array.isArray(body))throw Error();resolve(body);}catch{reject(new ApiError(400,'Solicitação inválida.'));}});req.on('error',reject);});}
-function createServer(config=configuration(),options={}){
+function createHandler(config=configuration(),options={}){
   const store=options.store||new SessionStore(config),auth=options.auth||new AuthService(config,store);
   const files={'/styles.css':'styles.css','/auth.css':'auth.css','/auth.js':'auth.js','/account-api.js':'account-api.js','/app.js':'app.js','/finance-query.js':'finance-query.js','/receipt-parser.js':'receipt-parser.js','/receipt-ui.js':'receipt-ui.js','/sw.js':'sw.js','/icon.svg':'icon.svg','/google-g.png':'google-g.png','/manifest.webmanifest':'manifest.webmanifest'};
   const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8'};
   const json=(res,status,body)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(body));};
   const html=(res,body,status=200)=>{res.writeHead(status,{'Content-Type':'text/html; charset=utf-8'});res.end(body);};
   const redirect=(res,where)=>{res.writeHead(303,{Location:where});res.end();};
-  const server=http.createServer(async(req,res)=>{
+  const handler=async(req,res)=>{
     res.setHeader('Cache-Control','private, no-store');res.setHeader('Pragma','no-cache');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob: data:; connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; worker-src 'self' blob: https://cdn.jsdelivr.net; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'");
     if(config.secure)res.setHeader('Strict-Transport-Security','max-age=31536000');
@@ -26,15 +26,15 @@ function createServer(config=configuration(),options={}){
       }
       const existingId=store.cookie(req);
       await store.locked(existingId||'anonymous-'+req.socket.remoteAddress,async()=>{
-        let session=store.read(existingId);
+        let session=await store.read(existingId);
         if(route==='/api/auth/session'&&req.method==='GET'){
-          if(!session){auth.limited(req,'anonymous',120);session=store.anonymous(res);}
+          if(!session){await auth.limited(req,'anonymous',120);session=await store.anonymous(res);}
           let user=null,needsConsent=false,recovery=false;
-          if(session.auth){try{const verified=await auth.verified(session);user={id:verified.user.id,email:verified.user.email};recovery=!!session.recovery;needsConsent=!recovery&&!await auth.consent(verified.client);}catch(error){if(error.status===401||error.status===403){store.remove(session.id);session=store.anonymous(res);}else throw error;}}
+          if(session.auth){try{const verified=await auth.verified(session);user={id:verified.user.id,email:verified.user.email};recovery=!!session.recovery;needsConsent=!recovery&&!await auth.consent(verified.client);}catch(error){if(error.status===401||error.status===403){await store.remove(session.id);session=await store.anonymous(res);}else throw error;}}
           json(res,200,{csrf:session.csrf,user,needsConsent,recovery,config:auth.publicConfig()});return;
         }
         if(route==='/auth/callback'&&req.method==='GET'){
-          try{redirect(res,await auth.callback(res,session,url));}catch{if(session){delete session.oauth;store.write(session);}redirect(res,'/login?notice=oauth-failed');}return;
+          try{redirect(res,await auth.callback(res,session,url));}catch{if(session){delete session.oauth;await store.write(session);}redirect(res,'/login?notice=oauth-failed');}return;
         }
         if(['/','/index.html','/app','/conta','/aceitar-documentos','/nova-senha'].includes(route)&&req.method==='GET'){
           try{
@@ -78,9 +78,14 @@ function createServer(config=configuration(),options={}){
       if(url?.pathname.startsWith('/api/'))json(res,status,{error:message});
       else html(res,pages.authPage('login',config),status);
     }
-  });
+  };
+  return handler;
+}
+function createServer(config=configuration(),options={}){
+  const store=options.store||new SessionStore(config);
+  const server=http.createServer(createHandler(config,{...options,store}));
   const pruning=setInterval(()=>{try{store.prune();}catch{/* Keep request handling independent of cleanup. */}},900000);pruning.unref();server.on('close',()=>clearInterval(pruning));
   server.requestTimeout=30000;server.headersTimeout=10000;return server;
 }
 if(require.main===module){try{const config=configuration();const server=createServer(config);server.on('error',error=>{console.error(error.code==='EADDRINUSE'?'Porta ocupada. Encerre a instância anterior desta aplicação.':error.code||'Falha ao iniciar');process.exitCode=1;});server.listen(config.port,'127.0.0.1',()=>console.log(`Falou, Anotou! em ${config.origin}\nSupabase: ${config.configured?'configurado':'pendente — login real desabilitado'}\nPublicação não realizada. Mantenha este processo ativo para testes locais.`));}catch(error){console.error(error.message);process.exitCode=1;}}
-module.exports={createServer,readJson};
+module.exports={createServer,createHandler,readJson};

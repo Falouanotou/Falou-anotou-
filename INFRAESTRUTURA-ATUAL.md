@@ -52,3 +52,13 @@ Configurar Client ID e Client Secret diretamente no provider Google do Supabase.
 O usuário confirmou que ainda não criou site Netlify. Não houve deploy. O backend Node atual usa sessões em arquivos locais e locks por processo; precisa de armazenamento compartilhado e adaptação antes de Netlify Functions. `dist` é um pacote de servidor, não um diretório estático adequado à publicação direta.
 
 Próximos passos: teste manual de Auth; configuração Google/SMTP; upload privado quando implementado; adaptação Netlify e homologação HTTPS; dois usuários reais descartáveis, voz/foto e exportação; backup/restauração; revisão jurídica, exclusão de conta, observabilidade e rate limiting. Pagamento real permanece fora do escopo e produção não foi liberada.
+
+## Atualização: preparação Netlify
+
+O usuário criou sua conta e acessou o aplicativo. Foram verificados pelo app real: lançamento fictício, persistência após recarga, consulta textual, exportação JSON e remoção autorizada. Os testes de recuperação/Google/duas contas e celular físico continuam pendentes.
+
+A adaptação Netlify foi implementada sem recriar o projeto: Function HTTP aproveita o backend existente; sessões, verificadores, locks condicionais e rate limit passam a Netlify Blobs com consistência forte e criptografia. O banco financeiro continua no mesmo Supabase. A execução local conserva o armazenamento de sessão em arquivos; produção Netlify não depende desse diretório.
+
+`npm run build:netlify` gera apenas 12 assets públicos; as páginas privadas e APIs são servidas pela Function. As duas entradas ES Modules carregam localmente. Os 17 testes Node e as regressões passaram; audit de dependências de runtime não encontrou vulnerabilidades conhecidas. As interações Blobs e Auth no teste Netlify são fixtures, não testes no site hospedado.
+
+Nenhum deploy foi realizado. Use `CONFIGURACAO-NETLIFY.md`: importação GitHub da branch de integração, variáveis privadas, origem HTTPS exata e callbacks Supabase. O ZIP é código-fonte, não um site estático para arrastar e soltar.
