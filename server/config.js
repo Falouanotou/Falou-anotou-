@@ -18,8 +18,10 @@ function configuration(env=process.env,root=path.resolve(__dirname,'..')){
   const termsVersion=env.TERMS_VERSION||'minuta-2026-10-12',privacyVersion=env.PRIVACY_VERSION||'minuta-2026-10-12';
   const company={name:env.COMPANY_NAME||'',document:env.COMPANY_DOCUMENT||'',address:env.COMPANY_ADDRESS||'',email:env.PRIVACY_CONTACT_EMAIL||''};
   const legalReady=env.LEGAL_APPROVED==='true'&&env.LEGAL_PUBLISHED==='true'&&Object.values(company).every(v=>v.trim())&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)&&![termsVersion,privacyVersion].some(v=>/minuta|draft/i.test(v));
+  // Legal drafts allow fictional tests, never commercial admission.
+  const signupAllowed=!production||legalReady;
   const minPassword=Number(env.PASSWORD_MIN_LENGTH||15),sessionDays=Number(env.SESSION_DAYS||30);
   if(!Number.isInteger(minPassword)||minPassword<15||minPassword>128||!Number.isInteger(sessionDays)||sessionDays<1||sessionDays>30)throw Error('Limites de senha/sessão inválidos.');
-  return {root,port,origin:origin.origin,host:origin.host,secure:origin.protocol==='https:',production,url,key,configured:!!url&&!!key,minPassword,sessionDays,google:env.GOOGLE_AUTH_ENABLED==='true',termsPath,privacyPath,termsVersion,privacyVersion,company,legalReady,signupAllowed:!production||legalReady,secret:env.SESSION_SECRET||'',runtime:env.AUTH_RUNTIME_DIR||path.join(root,'.runtime')};
+  return {root,port,origin:origin.origin,host:origin.host,secure:origin.protocol==='https:',production,url,key,configured:!!url&&!!key,minPassword,sessionDays,recoveryEnabled:env.PASSWORD_RECOVERY_ENABLED==='true',termsPath,privacyPath,termsVersion,privacyVersion,company,legalReady,signupAllowed,secret:env.SESSION_SECRET||'',runtime:env.AUTH_RUNTIME_DIR||path.join(root,'.runtime')};
 }
 module.exports={configuration};

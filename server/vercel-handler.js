@@ -4,6 +4,7 @@ const {configuration}=require('./config'),{createHandler}=require('../server');
 const {BlobSessionStore}=require('./blob-session-store'),{VercelBlobs}=require('./vercel-blob-adapter');
 function createVercelHandler({env=process.env,root=path.resolve(__dirname,'..'),sdkFactory=()=>import('@vercel/blob'),clientFactory}={}) {
  return async function(req,res){
+  const started=Date.now();res.once?.('finish',()=>{if(res.statusCode>=500)console.error(JSON.stringify({event:'request_failure',status:res.statusCode,duration_ms:Date.now()-started}));});
   try {
    if(!env.APP_ORIGIN)throw Error('Origem pendente.');
    const config=configuration({...env,NODE_ENV:env.APP_ENV||'production'},root);

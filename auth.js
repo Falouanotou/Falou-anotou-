@@ -15,10 +15,10 @@
     if(['login','signup'].includes(mode)&&state.user&&params.get('notice')!=='setup-required'){location.replace(state.recovery?'/nova-senha':state.needsConsent?'/aceitar-documentos':'/app');return;}
     if(['consent','reset','account'].includes(mode)&&!state.user){location.replace('/login');return;}
     if(['consent','reset'].includes(mode)&&state.user){const subtitle=document.querySelector('.auth-subtitle');subtitle.textContent+=' Conta: '+state.user.email;}
-    const notice={confirmed:'E-mail confirmado. Agora entre com sua conta.','password-updated':'Senha atualizada. Entre com a nova senha.','oauth-failed':'O login com Google foi cancelado ou expirou. Tente novamente.','session-expired':'Sua sessão expirou. Entre novamente.','setup-required':'Não consegui carregar sua conta. Confira a configuração do projeto e tente novamente.'}[params.get('notice')];if(notice)message(notice,['oauth-failed','setup-required'].includes(params.get('notice')));
+    const notice={confirmed:'E-mail confirmado. Agora entre com sua conta.','password-updated':'Senha atualizada. Entre com a nova senha.','session-expired':'Sua sessão expirou. Entre novamente.','setup-required':'Não consegui carregar sua conta. Confira a configuração do projeto e tente novamente.'}[params.get('notice')];if(notice)message(notice,['setup-required'].includes(params.get('notice')));
     if($('authConfiguration')&&(!state.config.configured||mode==='signup'&&!state.config.signupAllowed||state.config.development&&state.config.legalDraft)){
       const el=$('authConfiguration');el.hidden=false;
-      el.textContent=!state.config.configured?'A conexão de contas ainda não foi configurada. Login e cadastro não estão disponíveis por enquanto.':!state.config.signupAllowed?'O cadastro público aguarda a conclusão e revisão dos documentos.':'Ambiente de desenvolvimento: documentos em minuta. Use apenas contas fictícias para testar.';
+      el.textContent=!state.config.configured?'A conexão de contas ainda não foi configurada. Login e cadastro não estão disponíveis por enquanto.':mode==='signup'&&!state.config.signupAllowed?'O cadastro aguarda a revisão e publicação dos documentos.':'Ambiente de desenvolvimento: documentos em minuta. Use apenas contas fictícias para testar.';
     }
     $('passwordToggle')?.addEventListener('click',()=>{const input=$('authPassword'),show=input.type==='password';input.type=show?'text':'password';$('passwordToggle').textContent=show?'Ocultar senha':'Mostrar senha';$('passwordToggle').setAttribute('aria-pressed',String(show));});
     $('authForm')?.addEventListener('submit',event=>{
@@ -29,12 +29,11 @@
         const [route,body]=routes[mode];navigate(await api(route,body));
       });
     });
-    $('googleButton')?.addEventListener('click',()=>execute(async()=>navigate(await api('/api/auth/google',{}))));
     const logout=()=>execute(async()=>{await api('/api/auth/logout',{});if('BroadcastChannel'in window)new BroadcastChannel('falou-anotou-auth').postMessage('logout');location.replace('/login');});
     $('consentLogout')?.addEventListener('click',logout);$('accountLogout')?.addEventListener('click',logout);
     if(mode==='account'){
       const account=await api('/api/account');$('accountEmail').textContent=account.email;$('accountName').value=account.name;$('accountReadAloud').checked=account.readAloud;
-      $('accountPlan').textContent=account.premium?'Acesso premium autorizado pelo servidor. Não há cobrança nesta etapa.':'Conta básica. Assinaturas e cobranças ainda não foram implementadas.';
+      $('accountPlan').textContent='Acesso pessoal. A contratação e a liberação são realizadas diretamente com o responsável.';
       $('accountForm').addEventListener('submit',event=>{event.preventDefault();execute(async()=>navigate(await api('/api/account',{name:$('accountName').value.trim(),readAloud:$('accountReadAloud').checked})));});
       $('categoryForm').addEventListener('submit',event=>{event.preventDefault();execute(async()=>{navigate(await api('/api/account/category',{name:$('categoryName').value.trim()}));$('categoryName').value='';});});
     }

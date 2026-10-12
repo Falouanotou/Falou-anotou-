@@ -9,3 +9,4 @@ qa/
 public/
 .netlify/
 .vercel/
+supabase/.temp/

@@ -4,8 +4,8 @@ const {SessionStore}=require('./session-store');
 const unavailable=()=>Object.assign(Error('A sessão está ocupada ou o armazenamento não respondeu. Tente novamente.'),{status:503});
 class BlobSessionStore{
  constructor(config,blobs){
-  this.key=Buffer.from(config.secret||'','base64');if(this.key.length!==32)throw Error('Netlify exige SESSION_SECRET base64 de 32 bytes.');
-  this.days=config.sessionDays;this.secure=config.secure;if(!this.secure)throw Error('Netlify exige HTTPS.');
+  this.key=Buffer.from(config.secret||'','base64');if(this.key.length!==32)throw Error('Armazenamento de sessão exige SESSION_SECRET base64 de 32 bytes.');
+  this.days=config.sessionDays;this.secure=config.secure;if(!this.secure)throw Error('Armazenamento de sessão exige HTTPS.');
   this.cookieName='__Host-fa-session';this.blobs={};
   for(const method of ['get','getWithMetadata','set','setJSON','delete'])this.blobs[method]=async(...args)=>{try{return await blobs[method](...args);}catch{throw unavailable();}};
   this.blobs.list=async function*(options){try{yield* blobs.list(options);}catch{throw unavailable();}};

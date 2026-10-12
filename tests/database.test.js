@@ -6,7 +6,9 @@ test('Migrações e isolamento executados em PostgreSQL embutido, com identidade
   const db=new PGlite();
   try{
     await db.exec(`create role anon;create role authenticated;create role supabase_auth_admin;create schema auth;create schema storage;
-      create table auth.users(id uuid primary key,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}',is_anonymous boolean default false,deleted_at timestamptz);
+      create table auth.users(id uuid primary key,email_confirmed_at timestamptz,raw_user_meta_data jsonb default '{}',is_anonymous boolean default false,deleted_at timestamptz,banned_until timestamptz);
+      create table auth.sessions(id uuid primary key,user_id uuid references auth.users(id) on delete cascade,not_after timestamptz);
+      create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('session_id',current_setting('request.jwt.claim.sub',true))$$;
       create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
       grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;
       create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
@@ -14,6 +16,7 @@ test('Migrações e isolamento executados em PostgreSQL embutido, com identidade
       alter table storage.objects enable row level security;grant usage on schema storage to authenticated;grant select,insert,update,delete on storage.objects to authenticated;
       create function storage.foldername(name text) returns text[] language sql immutable as $$select (string_to_array(name,'/'))[1:greatest(array_length(string_to_array(name,'/'),1)-1,0)]$$;
       insert into auth.users(id,email_confirmed_at,raw_user_meta_data) values('${A}',now(),'{}'),('${B}',now(),'{}'),('${U}',null,'{}');`);
+    await db.exec(`insert into auth.sessions(id,user_id) select id,id from auth.users;`);
     const migrations=path.join(__dirname,'..','supabase','migrations');for(const file of fs.readdirSync(migrations).sort())await db.exec(fs.readFileSync(path.join(migrations,file),'utf8'));
     assert.equal((await db.query('select count(*)::integer n from public.profiles')).rows[0].n,3);
     // Secure default: production signup gate is closed, including direct Auth hooks.
@@ -45,9 +48,18 @@ test('Migrações e isolamento executados em PostgreSQL embutido, com identidade
     await db.query(`select public.apply_ledger_changes('[]'::jsonb,array['legacy-one'],0)`);
     await assert.rejects(db.query(`insert into public.ledger_entries(user_id,id,payload) values('${A}','x','{}')`));
     await assert.rejects(db.query(`update public.profiles set user_id='${A}' where user_id='${B}'`));
+    await db.exec(`reset role;update auth.users set banned_until=now()+interval '1 day' where id='${A}';`);await as(A);assert.equal((await db.query('select public.has_account_access() allowed')).rows[0].allowed,false);await assert.rejects(db.query('select public.get_my_ledger()'));await as(B);assert.equal((await db.query('select public.has_account_access() allowed')).rows[0].allowed,true);
+    await db.exec(`reset role;update auth.users set banned_until=null where id='${A}';delete from auth.sessions where user_id='${A}';`);await as(A);assert.equal((await db.query('select public.has_account_access() allowed')).rows[0].allowed,false);
+    await db.exec(`reset role;insert into auth.sessions(id,user_id) values('${A}','${A}');`);
     await as(A);assert.equal((await db.query('select public.get_my_ledger() data')).rows[0].data.entries.length,1);
+    await db.exec('reset role');const snapshot=await db.dumpDataDir();await as(A);
     await db.query(`select public.apply_ledger_changes('[]'::jsonb,array['legacy-one'],2)`);assert.equal((await db.query('select count(*)::integer n from public.receipt_items')).rows[0].n,0);
     await db.exec(`reset role;set role anon;select set_config('request.jwt.claim.sub','',false);`);await assert.rejects(db.query('select * from public.ledger_entries'));await assert.rejects(db.query('select public.get_my_ledger()'));
     await db.exec(`reset role;update app_private.security_policy set environment='production',legal_ready=false;`);await as(A);await assert.rejects(db.query('select public.get_my_ledger()'));
+    await db.exec(`reset role;delete from auth.users where id='${A}';`);
+    for(const table of ['profiles','legal_acceptances','user_settings','custom_categories','merchants','ledger_versions','ledger_entries','receipt_items','entitlements'])assert.equal((await db.query(`select count(*)::integer n from public.${table} where user_id='${A}'`)).rows[0].n,0);
+    assert.equal((await db.query(`select count(*)::integer n from auth.users where id='${B}'`)).rows[0].n,1);
+    const restored=new PGlite({loadDataDir:snapshot});
+    try{assert.equal((await restored.query(`select count(*)::integer n from public.ledger_entries where user_id='${A}'`)).rows[0].n,1);await restored.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${B}',false);`);assert.equal((await restored.query('select public.get_my_ledger() data')).rows[0].data.entries.length,0);}finally{await restored.close();}
   }finally{await db.close();}
 });

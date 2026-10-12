@@ -4,7 +4,7 @@ const {configuration}=require('./server/config'),{SessionStore}=require('./serve
 function readJson(req,maximum=16384){return new Promise((resolve,reject)=>{if(!/^application\/json(?:;|$)/i.test(req.headers['content-type']||'')){reject(new ApiError(415,'Use uma solicitação JSON.'));req.resume();return;}let size=0,chunks=[],failed=false;req.on('data',chunk=>{size+=chunk.length;if(size>maximum){if(!failed)reject(new ApiError(413,'Arquivo/solicitação acima do limite.'));failed=true;chunks=[];}else if(!failed)chunks.push(chunk);});req.on('end',()=>{if(failed)return;try{const body=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(!body||typeof body!=='object'||Array.isArray(body))throw Error();resolve(body);}catch{reject(new ApiError(400,'Solicitação inválida.'));}});req.on('error',reject);});}
 function createHandler(config=configuration(),options={}){
   const store=options.store||new SessionStore(config),auth=options.auth||new AuthService(config,store);
-  const files={'/styles.css':'styles.css','/auth.css':'auth.css','/auth.js':'auth.js','/account-api.js':'account-api.js','/app.js':'app.js','/finance-query.js':'finance-query.js','/receipt-parser.js':'receipt-parser.js','/receipt-ui.js':'receipt-ui.js','/sw.js':'sw.js','/icon.svg':'icon.svg','/google-g.png':'google-g.png','/manifest.webmanifest':'manifest.webmanifest'};
+  const files={'/styles.css':'styles.css','/auth.css':'auth.css','/auth.js':'auth.js','/account-api.js':'account-api.js','/app.js':'app.js','/finance-query.js':'finance-query.js','/receipt-parser.js':'receipt-parser.js','/receipt-ui.js':'receipt-ui.js','/sw.js':'sw.js','/icon.svg':'icon.svg','/manifest.webmanifest':'manifest.webmanifest'};
   const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.webmanifest':'application/manifest+json; charset=utf-8'};
   const json=(res,status,body)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8'});res.end(JSON.stringify(body));};
   const html=(res,body,status=200)=>{res.writeHead(status,{'Content-Type':'text/html; charset=utf-8'});res.end(body);};
@@ -32,9 +32,6 @@ function createHandler(config=configuration(),options={}){
           let user=null,needsConsent=false,recovery=false;
           if(session.auth){try{const verified=await auth.verified(session);user={id:verified.user.id,email:verified.user.email};recovery=!!session.recovery;needsConsent=!recovery&&!await auth.consent(verified.client);}catch(error){if(error.status===401||error.status===403){await store.remove(session.id);session=await store.anonymous(res);}else throw error;}}
           json(res,200,{csrf:session.csrf,user,needsConsent,recovery,config:auth.publicConfig()});return;
-        }
-        if(route==='/auth/callback'&&req.method==='GET'){
-          try{redirect(res,await auth.callback(res,session,url));}catch{if(session){delete session.oauth;await store.write(session);}redirect(res,'/login?notice=oauth-failed');}return;
         }
         if(['/','/index.html','/app','/conta','/aceitar-documentos','/nova-senha'].includes(route)&&req.method==='GET'){
           try{
@@ -66,7 +63,7 @@ function createHandler(config=configuration(),options={}){
           if(route==='/api/account/category'&&req.method==='POST'){
             const {client}=privateContext,body=await readJson(req);guard(typeof body.name==='string'&&body.name.trim().length>0&&body.name.trim().length<=60&&Object.keys(body).length===1,400,'Categoria inválida.');const {error}=await client.from('custom_categories').insert({name:body.name.trim()});guard(!error,409,'Essa categoria já existe ou não pôde ser criada.');json(res,200,{message:'Categoria adicionada.'});return;
           }
-          const actions={'/api/auth/login':()=>auth.login(req,res,session,body),'/api/auth/signup':()=>auth.signup(req,session,body),'/api/auth/forgot':()=>auth.forgot(req,session,body),'/api/auth/google':()=>auth.google(req,session,body),'/api/auth/confirm':()=>auth.confirm(res,session,body),'/api/auth/reset':()=>auth.reset(res,session,body),'/api/auth/accept':()=>auth.accept(session,body),'/api/auth/logout':()=>auth.logout(res,session)};
+          const actions={'/api/auth/login':()=>auth.login(req,res,session,body),'/api/auth/signup':()=>auth.signup(req,res,session,body),'/api/auth/forgot':()=>auth.forgot(req,session,body),'/api/auth/confirm':()=>auth.confirm(res,session,body),'/api/auth/reset':()=>auth.reset(res,session,body),'/api/auth/accept':()=>auth.accept(session,body),'/api/auth/logout':()=>auth.logout(res,session)};
           let body;
           if(actions[route]&&req.method==='POST'){body=await readJson(req);json(res,200,await actions[route]());return;}
         }
@@ -74,7 +71,7 @@ function createHandler(config=configuration(),options={}){
       });
     }catch(error){
       if(res.headersSent){res.end();return;}
-      const status=error.status||400,message=error.status?error.message:status===400?'Confira os dados informados.':'Não consegui concluir a solicitação.';
+      const status=error.status||500,message=error.status?error.message:status===400?'Confira os dados informados.':'Não consegui concluir a solicitação.';
       if(url?.pathname.startsWith('/api/'))json(res,status,{error:message});
       else html(res,pages.authPage('login',config),status);
     }
