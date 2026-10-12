@@ -7,12 +7,23 @@ class VercelBlobs {
   this.sdk=sdk;this.prefix='falou-anotou/'+namespace+'/';
  }
  async getWithMetadata(key,options={}) {
-  const result=await this.sdk.get(this.prefix+key,{access:'private',useCache:false});
-  if(!result)return null;
-  if(result.statusCode!==200||!result.stream||!result.blob.etag)throw Error('Leitura incompleta.');
-  const envelope=JSON.parse(await new Response(result.stream).text());
-  if(typeof envelope.data!=='string')throw Error('Objeto inválido.');
-  return {data:options.type==='json'?JSON.parse(envelope.data):envelope.data,metadata:envelope.metadata||{},etag:result.blob.etag};
+  const pathname=this.prefix+key,canonical=key.startsWith('sessions/');
+  for(let attempt=0;attempt<3;attempt++){
+   // The download representation's ETag can differ from the write API ETag
+   // for large/compressed session objects. Read the canonical metadata around
+   // the uncached body so a concurrent change can never receive a stale body.
+   let before;
+   if(canonical){try{before=await this.sdk.head(pathname);}catch(error){if(this.sdk.BlobNotFoundError&&error instanceof this.sdk.BlobNotFoundError)return null;throw error;}}
+   const result=await this.sdk.get(pathname,{access:'private',useCache:false});
+   if(!result)return null;
+   if(result.statusCode!==200||!result.stream||!result.blob.etag)throw Error('Leitura incompleta.');
+   const envelope=JSON.parse(await new Response(result.stream).text());
+   if(typeof envelope.data!=='string')throw Error('Objeto inválido.');
+   let etag=result.blob.etag;
+   if(canonical){const after=await this.sdk.head(pathname);if(!before.etag||before.etag!==after.etag)continue;etag=after.etag;if(etag!==result.blob.etag)console.warn(JSON.stringify({event:'session_etag_representation',different:true}));}
+   return {data:options.type==='json'?JSON.parse(envelope.data):envelope.data,metadata:envelope.metadata||{},etag};
+  }
+  throw Error('A versão do armazenamento mudou durante a leitura.');
  }
  async get(key,options={}) {return (await this.getWithMetadata(key,options))?.data??null;}
  async set(key,data,options={}) {

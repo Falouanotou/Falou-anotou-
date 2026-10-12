@@ -1,15 +1,26 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),crypto=require('node:crypto'),{Readable}=require('node:stream');
-const {BlobPreconditionFailedError}=require('@vercel/blob');
+const {BlobPreconditionFailedError,BlobNotFoundError}=require('@vercel/blob');
 const {VercelBlobs}=require('../server/vercel-blob-adapter'),{BlobSessionStore}=require('../server/blob-session-store'),{configuration}=require('../server/config'),{createVercelHandler}=require('../server/vercel-handler');
 class FakeVercelSDK {
- constructor(){this.data=new Map();this.version=0;this.BlobPreconditionFailedError=BlobPreconditionFailedError;}
+ constructor(){this.data=new Map();this.version=0;this.BlobPreconditionFailedError=BlobPreconditionFailedError;this.BlobNotFoundError=BlobNotFoundError;}
+ async head(key){const row=this.data.get(key);if(!row)throw new BlobNotFoundError();return {etag:row.etag};}
  async get(key,options){assert.equal(options.access,'private');assert.equal(options.useCache,false);const row=this.data.get(key);return row?{statusCode:200,stream:new Response(row.body).body,blob:{etag:row.etag}}:null;}
  async put(key,body,options){assert.equal(options.access,'private');assert.equal(options.addRandomSuffix,false);const old=this.data.get(key);if(options.ifMatch&&options.ifMatch!==old?.etag)throw new BlobPreconditionFailedError();if(!options.allowOverwrite&&old)throw Error('Already exists');const etag='version-'+(++this.version);this.data.set(key,{body,etag});return {etag};}
  async del(key){this.data.delete(key);}
  async list({prefix}){return {blobs:[...this.data.keys()].filter(k=>k.startsWith(prefix)).map(pathname=>({pathname})),hasMore:false};}
 }
 const env=()=>({APP_ENV:'development',APP_ORIGIN:'https://fixture.vercel.app',SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture',SESSION_SECRET:crypto.randomBytes(32).toString('base64')});
+test('Sessão usa ETag da API de escrita mesmo se a representação de download divergir',async()=>{
+ const sdk=new FakeVercelSDK(),get=sdk.get.bind(sdk);sdk.get=async(key,options)=>{const result=await get(key,options);if(result&&key.includes('/sessions/'))result.blob.etag='W/'+result.blob.etag;return result;};
+ const config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
+ const session=await store.rotate(response(),null,{user:{id:'fixture'},access_token:'x'.repeat(4000)});const copy=await store.read(session.id);copy.storage.updated=true;await store.write(copy);await store.remove(copy.id);assert.equal(await store.read(copy.id),null);
+});
+test('Mudança entre metadados e corpo obriga nova leitura antes de usar o ETag',async()=>{
+ const sdk=new FakeVercelSDK(),blobs=new VercelBlobs(sdk,'testes');await blobs.set('sessions/fixture','original');let changed=false;const get=sdk.get.bind(sdk);
+ sdk.get=async(key,options)=>{const result=await get(key,options);if(!changed){changed=true;await blobs.set('sessions/fixture','updated');}return result;};
+ const read=await blobs.getWithMetadata('sessions/fixture');assert.equal(read.data,'updated');assert.equal(read.etag,(await sdk.head('falou-anotou/testes/sessions/fixture')).etag);
+});
 test('Revogação Blob é idempotente e não restaura sessão removida',async()=>{
  const sdk=new FakeVercelSDK(),config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
  const session=await store.rotate(response(),null,{user:{id:'fixture'}});await store.remove(session.id);await store.remove(session.id);assert.equal(await store.read(session.id),null);
