@@ -20,6 +20,12 @@ test('Falha transitória na liberação do lock é repetida somente pelo própri
  const config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
  await store.locked('fixture',async()=>{});assert.equal(failed,true);await store.locked('fixture',async()=>{});
 });
+test('Troca do dono do lock não suprime uma recusa de autenticação',async()=>{
+ const sdk=new FakeVercelSDK(),put=sdk.put.bind(sdk);
+ sdk.put=async(key,body,options)=>{if(key.includes('/locks/')&&JSON.parse(JSON.parse(body).data).owner===''){sdk.data.set(key,{body:JSON.stringify({data:JSON.stringify({owner:'another-worker',until:Date.now()+90000}),metadata:{}}),etag:'another-version'});throw new BlobPreconditionFailedError();}return put(key,body,options);};
+ const config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
+ await assert.rejects(store.locked('fixture',async()=>{throw Object.assign(Error('Autenticação recusada'),{status:401});}),e=>e.status===401);
+});
 const response=()=>({headers:{},status:200,headersSent:false,setHeader(k,v){this.headers[k.toLowerCase()]=v;},writeHead(status,headers={}){this.status=status;for(const[k,v]of Object.entries(headers))this.setHeader(k,v);this.headersSent=true;},end(body){this.body=body?Buffer.from(body).toString():'';}});
 test('Resposta só termina depois da liberação do lock distribuído',async()=>{
  const res=response(),config=configuration({...env(),NODE_ENV:'development'});let released=false;

@@ -62,7 +62,7 @@ class BlobSessionStore{
    let etag=lease.etag,released=false;
    for(let attempt=0;attempt<2&&!released;attempt++){
     try{released=(await this.blobs.setJSON(key,{owner:'',until:0},{onlyIfMatch:etag,metadata:{expires:Date.now()+86400000}})).modified;if(released)break;}catch{/* Retry only while we still own this bounded lease. */}
-    try{const current=await this.blobs.getWithMetadata(key,{type:'json',consistency:'strong'});if(!current||current.data.owner!==owner)return;etag=current.etag;}catch{break;}
+    try{const current=await this.blobs.getWithMetadata(key,{type:'json',consistency:'strong'});if(!current||current.data.owner!==owner){released=true;break;}etag=current.etag;}catch{break;}
    }
    if(!released)console.error(JSON.stringify({event:'session_failure',code:'session_lock_release_failed'}));
   }
