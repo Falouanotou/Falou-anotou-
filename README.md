@@ -22,4 +22,4 @@ Leia [GUIA-CADASTRO-DIRETO.md](GUIA-CADASTRO-DIRETO.md): ajustes remotos, migra�
 
 `npm test`: parser/OCR, finanças, sessão, CSRF, cadastro com provedor fixture, PostgreSQL embutido com duas identidades fictícias, suspensão, revogação, exclusão em cascata e restauração local. `npm run test:browser`: Chrome desktop e tela mobile simulada, sem autenticação falsa. Os testes não equivalem a testes remotos nem em celular físico.
 
-A entrega atual não foi publicada e não está liberada comercialmente. O link de homologação existente continua disponível, com a versão anterior.
+Entrega publicada e validada exclusivamente em homologação: https://falou-anotou-testes.vercel.app/login. Testes reais com duas contas fictícias passaram em cadastro imediato, isolamento por usuário, exportação, persistência após fechar/reabrir Chrome e logout. Celular físico e restauração do Supabase hospedado ainda exigem validação. Não está liberada comercialmente.

@@ -4,15 +4,15 @@
 
 Código preparado localmente para cadastro com nome, e-mail e senha, sessão imediata do Supabase e aceite dos documentos na mesma solicitação. Google e convites foram retirados da aplicação. Não existe verificação de pagamento: qualquer pessoa com o link pode se cadastrar quando o cadastro for habilitado.
 
-As mudanças desta entrega ainda não foram aplicadas ao banco hospedado nem publicadas. O endereço existente `https://falou-anotou-testes.vercel.app` continua sendo homologação. Não é uma liberação comercial.
+A migração de segurança foi aplicada, o cadastro imediato foi habilitado e o código foi publicado e validado em `https://falou-anotou-testes.vercel.app`. Publicação autorizada exclusivamente para homologação, com contas fictícias; não é uma liberação comercial. O código funcional validado está no commit `abc0bce`; a atualização posterior desta documentação não altera esse comportamento.
 
-## Ajustes no Supabase para testes
+## Configurações já aplicadas no Supabase de testes
 
-1. Authentication → Sign In / Providers: habilitar **Allow new users to sign up**. Na etapa anterior essa opção foi desabilitada; precisa ser reaberta para este novo fluxo.
+1. Authentication → Sign In / Providers: habilitar **Allow new users to sign up**. Já está habilitada para este novo fluxo de homologação.
 2. Desabilitar **Confirm email**, mantendo Email habilitado, Google e login anônimo desabilitados. O Supabase passa a confirmar automaticamente a identidade de e-mail: não haverá prova de posse do endereço. Evitar cadastrar endereços pertencentes a terceiros.
-3. Aplicar pelo SQL Editor somente a nova migração `supabase/migrations/20261012175921_manual_access.sql`, após revisar o conteúdo e confirmar a estrutura de `auth.sessions`. Ela reforça suspensão/revogação, sem excluir registros. As três migrações anteriores já existem no projeto hospedado; não reaplicá-las.
+3. Já aplicada pelo SQL Editor somente a nova migração `supabase/migrations/20261012175921_manual_access.sql`, após revisão do conteúdo e confirmação da estrutura de `auth.sessions`. Ela reforça suspensão/revogação, sem excluir registros. As três migrações anteriores já existem no projeto hospedado; não reaplicá-las.
 4. Conferir que o hook `public.before_user_created` permanece habilitado e que a política interna está em `development`, com documentos em minuta, exclusivamente para testes fictícios. A nova migração não remove o bloqueio jurídico de produção.
-5. Site URL deve ser o domínio HTTPS do ambiente. `/auth/confirm` só é necessário para eventual recuperação de senha por e-mail. `/auth/callback` pode ser removido da lista de redirects: o Google foi removido.
+5. Site URL deve ser o domínio HTTPS do ambiente. `/auth/confirm` só é necessário para eventual recuperação de senha por e-mail. `/auth/callback` foi removido da lista de redirects. Restam somente `/auth/confirm` no localhost e no domínio de homologação; Google e login anônimo estão desabilitados.
 
 Configurações que alteram a confirmação de identidade devem ser revisadas pelo responsável antes de salvar. Não é necessário adicionar SMTP para o cadastro imediato. Já havia SMTP Gmail no painel; esta entrega não altera nem valida suas credenciais.
 
@@ -20,13 +20,15 @@ Configurações que alteram a confirmação de identidade devem ser revisadas pe
 
 Framework Other, Node 22.x, build `npm run build:vercel`, saída `public`, Function `api/app.js`. Publicar o código pelo repositório; não enviar `public` como site estático, porque autenticação e rotas privadas dependem do backend.
 
-Manter `APP_ENV=development` somente em homologação. Manter Supabase URL e chave publishable no servidor, `APP_ORIGIN` exata, Blob **PRIVATE**, `SESSION_SECRET` base64 de 32 bytes, `SESSION_NAMESPACE=homologacao-vercel`, `SESSION_DAYS=30`, `PASSWORD_MIN_LENGTH=15`, `PASSWORD_RECOVERY_ENABLED=false`, versões atuais dos documentos e `LEGAL_APPROVED=false`, `LEGAL_PUBLISHED=false`. A variável antiga `GOOGLE_AUTH_ENABLED` não é mais utilizada e pode ser removida.
+Manter `APP_ENV=development` somente em homologação. Manter Supabase URL e chave publishable no servidor, `APP_ORIGIN` exata, Blob **PRIVATE**, `SESSION_SECRET` base64 de 32 bytes, `SESSION_NAMESPACE=homologacao-vercel`, `SESSION_DAYS=30`, `PASSWORD_MIN_LENGTH=15`, `PASSWORD_RECOVERY_ENABLED=false`, versões atuais dos documentos e `LEGAL_APPROVED=false`, `LEGAL_PUBLISHED=false`. A variável obsoleta `GOOGLE_AUTH_ENABLED` foi excluída com autorização específica. Recuperação desativada é o padrão do código quando a variável correspondente não existe.
 
-Após aplicar a migração, publicar somente em homologação e validar o build Ready. Não ativar produção comercial usando as minutas. O serviço falha fechado se a nova função de autorização estiver ausente.
+Migração aplicada e deploy de homologação verificado como Ready. Não ativar produção comercial usando as minutas. O serviço falha fechado se a nova função de autorização estiver ausente.
 
-## Validação real pendente
+## Validação realizada e pendências de hardware
 
-Criar duas contas fictícias pela interface, em navegadores/perfis separados. Cada uma deve registrar uma despesa distinta, fechar e reabrir, consultar e exportar o histórico e sair/entrar novamente. Conferir que a conta B não vê, altera ou apaga registros de A, também tentando os endpoints/RPCs com o token da própria B. Não reutilizar contas de clientes nem registrar dados reais nesses testes.
+Duas contas fictícias Supabase Auth foram criadas pelo aplicativo sem confirmação de e-mail e com acesso imediato. Na hospedagem real foram validados gravação, isolamento do histórico, tentativa de exclusão cruzada, proprietário forjado, logout e novo login. A API direta do Supabase recusou leitura, alteração e exclusão cruzadas e acesso anônimo. Chrome desktop e viewport mobile passaram em login, histórico isolado, exportação JSON, fechamento completo e reabertura do navegador com sessão persistida e logout. Nenhuma conta existente foi modificada. As duas contas e lançamentos fictícios permanecem identificados para revisão.
+
+`npm test` passou com 25 testes Node, além das regressões financeiras/parser; Chrome local e build Vercel também passaram. Suspensão, revogação, exclusão em cascata e restauração completa foram testadas em PostgreSQL embutido, não em contas reais do projeto hospedado. O Advisor remoto retornou zero erros e cinco avisos: quatro funções SECURITY DEFINER já existentes, com autorização por usuário, e proteção contra senhas vazadas desabilitada. Isso não representa certificação de segurança.
 
 Testar no celular físico, abrindo o link pelo WhatsApp e pelo navegador: teclado, câmera, revisão da nota, OCR, microfone, permissão de áudio, histórico e exportação. Navegadores internos podem limitar o microfone; quando necessário abrir no Chrome/Safari. A câmera pode oferecer captura ou seleção de foto conforme o aparelho. Simulação de tela pequena não equivale a teste de hardware.
 
@@ -62,10 +64,9 @@ Fontes oficiais: [Supabase Auth por senha](https://supabase.com/docs/guides/auth
 
 ## Bloqueadores comerciais
 
-- Migração nova e configuração de cadastro imediato ainda não aplicadas no projeto hospedado.
-- Código desta entrega ainda não publicado nem validado com duas contas Auth reais.
 - Documentos, identificação, contato e condições comerciais pendentes de revisão/aprovação.
 - Plano Vercel compatível com venda ainda não contratado pelo responsável.
-- Recuperação administrativa, restauração remota, limpeza de sessões e testes no celular físico pendentes.
+- Recuperação administrativa, suspensão/exclusão remotas em contas fictícias, restauração remota, limpeza de sessões e testes no celular físico pendentes.
+- Separação efetiva do ambiente comercial, segredos próprios e revisão dos avisos de segurança pendentes.
 
 Não distribuir este ambiente como produto comercial pronto antes de concluir esses pontos.
