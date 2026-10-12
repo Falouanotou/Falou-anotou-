@@ -2,6 +2,11 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),{EventEmitter}=require('node:events');
 const {configuration}=require('../server/config'),{AuthService}=require('../server/auth-service'),pages=require('../server/pages'),{createVercelHandler}=require('../server/vercel-handler');
 const config=()=>configuration({SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'});
+test('Lançamento com proprietário forjado retorna 400 antes de escrever no banco',async()=>{
+ const service=new AuthService(config(),{});let written=false;
+ await assert.rejects(service.changes(null,{revision:0,additions:[{id:'fake',type:'expense',amount:1,date:'2026-10-12',user_id:'other'}],removeIds:[]},{client:{rpc(){written=true;}}}),e=>e.status===400);
+ assert.equal(written,false);
+});
 test('Cadastro direto e Google ausente; documentos incompletos bloqueiam produção',async()=>{
  const c=config();assert.equal(c.signupAllowed,true);assert.ok(pages.authPage('login',c).includes('/cadastro'));assert.ok(!pages.authPage('login',c).includes('googleButton'));assert.ok(pages.authPage('signup',c).includes('authName'));
  const prod=configuration({NODE_ENV:'production',APP_ORIGIN:'https://fixture.example.invalid',SUPABASE_URL:c.url,SUPABASE_PUBLISHABLE_KEY:c.key});
