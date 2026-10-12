@@ -89,7 +89,11 @@ Em **Authentication → URL Configuration**:
 - Redirect URLs: `http://localhost:8080/auth/confirm` e `http://localhost:8080/auth/callback`.
 - Não use wildcard de host/path nem permita destinos externos arbitrários. O identificador de fluxo e o verificador PKCE ficam no servidor; o exchange utiliza esse fluxo específico. Não ativamos a opção experimental de adicionar `sb_flow_id` à URL. Os redirects são fixos e a identidade é validada após o exchange.
 
-Em **Authentication → Email Templates**, use os modelos abaixo. Isso é necessário para o fluxo de confirmação no servidor, que valida `token_hash` oficialmente com `verifyOtp` e não aceita tokens no localStorage. Links não são consumidos por um GET de scanner de e-mail: a página exige confirmação do usuário por POST.
+Os templates padrão do Supabase agora são aceitos por PKCE: o servidor guarda o verificador de cada solicitação, e a página exige um POST para trocar o código. Abra o link no mesmo navegador em que iniciou cadastro/recuperação. Outro navegador ou cookie perdido não consegue concluir a troca: solicite outro link no navegador desejado. O tipo de recuperação vem do fluxo guardado no servidor, nunca de um parâmetro controlado pelo navegador. O link padrão é verificado inicialmente pelo próprio Supabase; scanners podem consumir essa etapa antes de o usuário clicar.
+
+O painel do projeto atual exige SMTP próprio ou plano Pro para editar templates; não foi contratado um serviço nem alterado o plano. O SMTP padrão é restrito a testes e não habilita envio geral a clientes. Para comercializar, configurar SMTP confiável é uma pendência.
+
+Quando houver SMTP e edição habilitados, os modelos abaixo permitem confirmação por `token_hash` com `verifyOtp`, inclusive em outro navegador. A confirmação no aplicativo é por POST; um GET de scanner ao aplicativo não consome o token.
 
 **Confirm sign up:**
 

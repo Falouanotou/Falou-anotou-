@@ -40,7 +40,9 @@ class AuthService{
     guard(this.config.signupAllowed,403,'O cadastro público aguarda a conclusão dos documentos.');this.ready();this.limited(req,'signup');
     const email=this.email(body.email);this.password(body.password);guard(body.password===body.confirmPassword,400,'As senhas precisam ser iguais.');
     guard(body.accepted===true,400,'Leia e aceite os Termos de Uso e a Política de Privacidade.');guard(typeof body.name==='string'&&body.name.trim().length>=2&&body.name.trim().length<=100,400,'Informe seu nome (2 a 100 caracteres).');
-    const client=this.client(session),{data,error}=await client.auth.signUp({email,password:body.password,options:{emailRedirectTo:this.config.origin+'/auth/confirm',data:{name:body.name.trim()}}});
+    const client=this.client(session),before=new Set(Object.keys(session.storage)),{data,error}=await client.auth.signUp({email,password:body.password,options:{emailRedirectTo:this.config.origin+'/auth/confirm',data:{name:body.name.trim()}}});
+    delete session.emailFlow;
+    if(!error&&!data?.session)this.captureEmailFlow(session,before,'email',email);
     // Never admit an automatically confirmed account when provider configuration is wrong.
     if(data?.session)await client.auth.signOut({scope:'local'});
     delete session.storage?.['fa-server-auth'];this.store.write(session);
@@ -49,7 +51,12 @@ class AuthService{
     if(error&&(error.status>=500||error.name==='AuthRetryableFetchError'))throw new ApiError(503,'O serviço de cadastro não respondeu. Tente novamente.');
     return {message:'Se o cadastro puder ser concluído, você receberá um e-mail de confirmação. Depois, entre e confirme os documentos na sua conta.'};
   }
-  async forgot(req,session,body){this.ready();this.limited(req,'forgot');const email=this.email(body.email),client=this.client(session);await client.auth.resetPasswordForEmail(email,{redirectTo:this.config.origin+'/auth/confirm'});this.store.write(session);return {message:'Se este e-mail puder receber uma recuperação, enviaremos as instruções. Confira também a pasta de spam.'};}
+  captureEmailFlow(session,before,type,email){
+    // SDK pinned in lockfile: retain the new per-flow verifier, never a client flow ID.
+    const key=Object.keys(session.storage).find(k=>!before.has(k)&&/^fa-server-auth-flow-[a-zA-Z0-9_-]+-code-verifier$/.test(k));
+    if(key)session.emailFlow={type,email,flowId:key.slice('fa-server-auth-flow-'.length,-'-code-verifier'.length),until:Date.now()+3600000};
+  }
+  async forgot(req,session,body){this.ready();this.limited(req,'forgot');const email=this.email(body.email),client=this.client(session),before=new Set(Object.keys(session.storage));const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:this.config.origin+'/auth/confirm'});delete session.emailFlow;if(!error)this.captureEmailFlow(session,before,'recovery',email);this.store.write(session);return {message:'Se este e-mail puder receber uma recuperação, enviaremos as instruções. Confira também a pasta de spam.'};}
   async google(req,session,body){
     guard(this.config.signupAllowed,403,'O login com Google aguarda a liberação dos documentos.');this.ready();guard(this.config.google,503,'O login com Google ainda precisa ser configurado.');this.limited(req,'google');
     session.oauth={until:Date.now()+600000};
@@ -67,9 +74,21 @@ class AuthService{
     this.store.rotate(res,session,data.session);return '/app';
   }
   async confirm(res,session,body){
-    this.ready();guard(['email','recovery'].includes(body.type)&&typeof body.tokenHash==='string'&&/^[a-f0-9]{32,128}$/i.test(body.tokenHash),400,'Link de confirmação inválido.');
-    const client=this.client(session),{data,error}=await client.auth.verifyOtp({type:body.type,token_hash:body.tokenHash});guard(!error&&data.session&&data.user?.email_confirmed_at,400,'O link expirou ou já foi utilizado. Solicite outro.');
-    if(body.type==='recovery'){this.store.rotate(res,session,data.session,{recovery:Date.now()+900000});return {redirect:'/nova-senha'};}
+    this.ready();const client=this.client(session);let result,type;
+    if(body.code){
+      const flow=session.emailFlow;
+      guard(flow&&flow.until>Date.now()&&session.storage?.[`fa-server-auth-flow-${flow.flowId}-code-verifier`],400,'Abra o link no mesmo navegador em que fez a solicitação. Se o prazo venceu, solicite outro link.');
+      guard(typeof body.code==='string'&&body.code.length<=2048&&!/\s/.test(body.code)&&(!body.flowId||constantEqual(body.flowId,flow.flowId)),400,'Link de confirmação inválido.');
+      type=flow.type;
+      result=await client.auth.exchangeCodeForSession(body.code,{flowId:flow.flowId});
+      guard(!result.error&&result.data?.user?.email?.toLowerCase()===flow.email,400,'O link expirou, já foi utilizado ou não corresponde a esta solicitação.');
+      delete session.emailFlow;
+    }else{
+      guard(['email','recovery'].includes(body.type)&&typeof body.tokenHash==='string'&&/^[a-f0-9]{32,128}$/i.test(body.tokenHash),400,'Link de confirmação inválido.');
+      type=body.type;result=await client.auth.verifyOtp({type,token_hash:body.tokenHash});
+    }
+    const {data,error}=result;guard(!error&&data.session&&data.user?.email_confirmed_at,400,'O link expirou ou já foi utilizado. Solicite outro.');
+    if(type==='recovery'){this.store.rotate(res,session,data.session,{recovery:Date.now()+900000});return {redirect:'/nova-senha'};}
     await client.auth.signOut({scope:'local'});this.store.remove(session.id);this.store.setCookie(res,'',0);return {redirect:'/login?notice=confirmed'};
   }
   async reset(res,session,body){

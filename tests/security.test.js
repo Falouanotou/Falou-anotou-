@@ -11,6 +11,31 @@ test('SDK oficial gera challenge PKCE e guarda o flow ID no servidor, sem abrir 
   }finally{cleanup(s.dir);}
 });
 function cleanup(dir){const root=path.resolve(os.tmpdir());if(!path.resolve(dir).startsWith(root+path.sep+'falou-auth-test-'))throw Error('Diretório temporário de teste inesperado.');fs.rmSync(dir,{recursive:true,force:true});}
+test('SDK oficial preserva verificadores distintos para e-mail padrão e recuperação (HTTP fixture)',async()=>{
+ const s=setup({SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'});
+ try{
+  const {createClient}=require('@supabase/supabase-js');const requests=[];
+  const factory=(url,key,options)=>createClient(url,key,{...options,global:{fetch:async(url,init)=>{requests.push({url:String(url),body:JSON.parse(init.body)});return Response.json(String(url).includes('/signup')?{id:'fictional-id',email:'fixture@example.invalid',identities:[]}:{},{status:200});}}});
+  const auth=new AuthService(s.config,s.store,factory),session=s.store.anonymous(response()),req={socket:{remoteAddress:'test'}};
+  await auth.signup(req,session,{email:'fixture@example.invalid',name:'Fictício',password:'long-fixture-password',confirmPassword:'long-fixture-password',accepted:true});
+  assert.equal(session.emailFlow.type,'email');const first=session.emailFlow.flowId;assert.ok(session.storage[`fa-server-auth-flow-${first}-code-verifier`]);
+  await auth.forgot(req,session,{email:'fixture@example.invalid'});assert.equal(session.emailFlow.type,'recovery');assert.notEqual(session.emailFlow.flowId,first);
+  assert.equal(s.store.read(session.id).emailFlow.flowId,session.emailFlow.flowId);
+  for(const request of requests){assert.equal(new URL(request.url).searchParams.get('redirect_to'),s.config.origin+'/auth/confirm');assert.equal(request.body.code_challenge_method,'s256');assert.ok(request.body.code_challenge);}
+ }finally{cleanup(s.dir);}
+});
+test('Confirmação padrão exige cookie/flow e não aceita elevar cadastro a recuperação pelo cliente',async()=>{
+ const s=setup({SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture'});
+ try{
+  let calls=0;const factory=()=>({auth:{async exchangeCodeForSession(code,options){calls++;assert.equal(options.flowId,'fixture-flow');return {data:{session:{access_token:'fixture',user:{id:'fixture-user'}},user:{email:'fixture@example.invalid',email_confirmed_at:'2026-10-12'}},error:null};},async signOut(){return {error:null};}}});
+  const auth=new AuthService(s.config,s.store,factory),fresh=()=>{const session=s.store.anonymous(response());session.emailFlow={flowId:'fixture-flow',type:'email',email:'fixture@example.invalid',until:Date.now()+60000};session.storage['fa-server-auth-flow-fixture-flow-code-verifier']='fixture-verifier';return session;};
+  const missing=s.store.anonymous(response());await assert.rejects(auth.confirm(response(),missing,{code:'fixture-code'}),error=>error.status===400);
+  const wrong=fresh();await assert.rejects(auth.confirm(response(),wrong,{code:'fixture-code',flowId:'foreign-flow'}),error=>error.status===400);assert.equal(calls,0);
+  const signup=fresh();assert.equal((await auth.confirm(response(),signup,{code:'fixture-code',type:'recovery'})).redirect,'/login?notice=confirmed');assert.equal(s.store.read(signup.id),null);
+  const recovery=fresh();recovery.emailFlow.type='recovery';const res=response();assert.equal((await auth.confirm(res,recovery,{code:'fixture-code',type:'email'})).redirect,'/nova-senha');
+  const id=res.headers['Set-Cookie'].split(';')[0].split('=')[1];assert.ok(s.store.read(id).recovery>Date.now());assert.equal(s.store.read(recovery.id),null);
+ }finally{cleanup(s.dir);}
+});
 test('Configuração falha fechada e não aceita segredo administrativo',()=>{assert.throws(()=>configuration({NODE_ENV:'production',APP_ORIGIN:'http://localhost:8080'}));assert.throws(()=>configuration({SUPABASE_URL:'https://test.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_secret_forbidden'}));assert.throws(()=>configuration({TERMS_PATH:'/app'}));assert.throws(()=>configuration({TERMS_PATH:'//external'}));const c=configuration({NODE_ENV:'production',APP_ORIGIN:'https://app.example.invalid',SUPABASE_URL:'https://test.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test',SESSION_SECRET:crypto.randomBytes(32).toString('base64')});assert.equal(c.signupAllowed,false);assert.equal(c.legalReady,false);});
 test('Cookie opaco HttpOnly, tokens criptografados, rotação e persistência',()=>{const s=setup();try{const res=response(),anon=s.store.anonymous(res),token='TEST-TOKEN-ONLY';assert.match(res.headers['Set-Cookie'],/HttpOnly; SameSite=Lax/);const logged=s.store.rotate(res,anon,{access_token:token,refresh_token:'TEST-REFRESH'});assert.equal(s.store.read(anon.id),null);assert.equal(s.store.read(logged.id).auth.access_token,token);assert.ok(!fs.readFileSync(s.store.filename(logged.id),'utf8').includes(token));const again=new SessionStore(s.config);assert.equal(again.read(logged.id).auth.access_token,token);assert.equal(again.read('a'.repeat(64)),null);assert.throws(()=>s.store.filename('../file'));const text=fs.readFileSync(s.store.filename(logged.id),'utf8');fs.writeFileSync(s.store.filename(logged.id),text.substring(0,20)+'X'+text.substring(21));assert.equal(s.store.read(logged.id),null);}finally{cleanup(s.dir);}});
 test('Origem e CSRF são obrigatórios',()=>{const s=setup();try{const auth=new AuthService(s.config,s.store),anon=s.store.anonymous(response());assert.throws(()=>auth.csrf({headers:{origin:'https://attacker.invalid','x-csrf-token':anon.csrf}},anon));assert.throws(()=>auth.csrf({headers:{origin:s.config.origin,'x-csrf-token':'wrong'}},anon));assert.doesNotThrow(()=>auth.csrf({headers:{origin:s.config.origin,'x-csrf-token':anon.csrf}},anon));}finally{cleanup(s.dir);}});

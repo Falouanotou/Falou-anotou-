@@ -12,7 +12,7 @@ npm start
 
 Abra **http://localhost:8080/**. O servidor desta entrega já está ativo localmente; a tela de login pode ser examinada. Não inicie uma segunda instância na mesma porta. O túnel público anterior foi encerrado.
 
-**Supabase ainda não foi criado/configurado.** Cadastro, senha, Google e recuperação usam o provedor real e só podem ser ativados após configuração. Sem backend, o painel fica bloqueado; não há acesso demonstrativo que contorne a autenticação.
+**Supabase de desenvolvimento conectado:** projeto `hlkxgjjspmdrwpkbqwuf`, informado pelo responsável. As nove tabelas, RLS, RPCs, bucket privado e hook de cadastro foram instalados e verificados. O `.env` local está configurado, mas não é incluído no Git ou nos pacotes. Em outro computador, configure URL/chave pública conforme o guia. Google, SMTP para clientes e testes completos de cadastro/login continuam pendentes. Sem backend configurado, o painel fica bloqueado; não há acesso demonstrativo que contorne a autenticação.
 
 A versão agora depende deste servidor. Não use `python -m http.server` ou `npx serve` para autenticação.
 
@@ -20,6 +20,7 @@ A versão agora depende deste servidor. Não use `python -m http.server` ou `npx
 
 - [Configuração completa de Supabase, Google OAuth, e-mails, variáveis e produção](CONFIGURACAO-AUTH.md)
 - [Roteiro de testes reais e limites do que foi validado](TESTES-AUTH.md)
+- [Estado atual da infraestrutura e pendências de homologação](INFRAESTRUTURA-ATUAL.md)
 - Minuta de Termos de Uso: **/termos-de-uso**
 - Minuta de Política de Privacidade: **/politica-de-privacidade**
 
@@ -47,4 +48,6 @@ A verificação `lint` cobre sintaxe e referências HTML. Testes incluem regress
 
 UI em Chromium, conforme disponibilidade de Playwright: `npm run test:browser`. Consulte o guia para os caminhos deste computador. A integração real possui teste separado, `npm run test:integration`; sem projeto/contas ele reporta PENDENTE.
 
-**Ainda não foram testados no provedor real:** cadastro/confirmar e-mail, login por senha/Google, SMTP, recuperação, renovação/revogação e gravações num Supabase hospedado. O PostgreSQL embutido testa as políticas reais de banco, mas seus schemas de plataforma/identidades são fixtures, não um Supabase operacional.
+**Testado no PostgreSQL hospedado:** persistência de lançamentos/itens, revisões e isolamento entre identidades sintéticas por SQL, com rollback de todos os dados de teste. Roteiro: `tests/hosted-rls.sql`, somente no desenvolvimento. Isso não constitui login pelo Supabase Auth. Os 12 testes Node e as verificações de interface desktop/celular também passaram.
+
+**Ainda não foram testados de ponta a ponta:** cadastro/confirmar e-mail, login por senha/Google, SMTP, recuperação, renovação/revogação e gravação pelo aplicativo com contas reais descartáveis. Hospedagem Netlify e microfone em celular físico também estão pendentes.

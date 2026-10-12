@@ -7,7 +7,7 @@
   const execute=async(operation)=>{if(busy)return;busy=true;message('Aguarde…');const buttons=[...document.querySelectorAll('button')];buttons.forEach(b=>{b.disabled=true;});$('authForm')?.setAttribute('aria-busy','true');try{await operation();}catch(error){message(error instanceof TypeError?'A conexão falhou. Confira sua conexão e tente novamente.':error.message||'Não consegui concluir. Tente novamente.',true);}finally{busy=false;buttons.forEach(b=>{b.disabled=false;});$('authForm')?.removeAttribute('aria-busy');}};
   const navigate=data=>{if(data.redirect)location.assign(data.redirect);else if(data.url)location.assign(data.url);else message(data.message);};
   // Remove bearer confirmation hashes from the visible URL before any further navigation.
-  const params=new URLSearchParams(location.search),confirmation={tokenHash:params.get('token_hash'),type:params.get('type')};
+  const params=new URLSearchParams(location.search),confirmation={tokenHash:params.get('token_hash'),type:params.get('type'),code:params.get('code'),flowId:params.get('sb_flow_id')};
   if(mode==='confirm')history.replaceState(null,'',location.pathname);
   try{
     state=await api('/api/auth/session');
