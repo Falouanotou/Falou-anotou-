@@ -75,3 +75,9 @@ button:active{filter:brightness(.94)}
 @media(pointer:coarse){input,textarea,select,.command-form input,.search-row input,.review-grid input,.review-grid select,.receipt-form textarea{font-size:16px}.button,.example,.send-button,.del-entry,.modal-close,.voice-help-actions button,.dictation-button,.voice-help-toggle,.answer-head button{min-height:44px;min-width:44px}.shell{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}}
 @media(max-width:400px){.entry{flex-wrap:wrap}.entry-info{flex-basis:calc(100% - 60px)}.entry-value{margin-left:46px}.del-entry{margin-left:auto}.listen-foot{flex-wrap:wrap}.support-label{text-align:left}.receipt-header{align-items:flex-start}.receipt-illustration{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+/* Acesso à câmera dentro da barra de comando; usa o fluxo de notas existente. */
+.command-camera-button{display:grid;place-items:center;flex-shrink:0;width:39px;height:39px;padding:0;border:0;border-radius:10px;background:#eaf0e9;color:#24483e;touch-action:manipulation}
+.command-form .send-button{flex-shrink:0}
+.command-camera-button:focus-visible{outline:2px solid #27835a;outline-offset:2px}
+@media(hover:hover) and (pointer:fine){.command-camera-button:hover{background:#deeadf}}
+@media(pointer:coarse){.command-camera-button{min-width:44px;min-height:44px}}

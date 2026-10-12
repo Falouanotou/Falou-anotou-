@@ -59,6 +59,9 @@
             <form id="commandForm" class="command-form">
               <label for="commandInput" class="visually-hidden">Digite uma despesa, receita ou pergunta</label>
               <input id="commandInput" autocomplete="off" placeholder="Ou digite: gastei 35 reais no mercado..." maxlength="360" enterkeyhint="send">
+              <button id="receiptQuickCameraBtn" class="command-camera-button" type="button" aria-label="Fotografar nota fiscal" title="Fotografar nota fiscal">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14.5 4h-5L7.5 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.5z"/><circle cx="12" cy="13" r="3.5"/></svg>
+              </button>
               <button class="send-button" type="submit" aria-label="Interpretar comando">➜</button>
             </form>
             <div class="voice-tools">
@@ -73,7 +76,6 @@
                 <button type="button" id="voiceHelpClose">Fechar</button>
               </div>
             </section>
-            <button type="button" id="receiptQuickCameraBtn" class="camera-shortcut">◉ Fotografar uma nota fiscal</button>
             <div class="examples"><span>EXPERIMENTE:</span>
               <button type="button" class="example" data-command="Gastei 35 reais no mercado hoje">+ Gastei R$ 35</button>
               <button type="button" class="example" data-command="Quanto gastei esse mês?">? Gastos do mês</button>
