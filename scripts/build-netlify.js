@@ -7,4 +7,5 @@ const files=['styles.css','auth.css','auth.js','account-api.js','app.js','financ
 fs.mkdirSync(dest,{recursive:true});
 for(const name of fs.readdirSync(dest))if(!files.includes(name))throw Error('Arquivo público inesperado: '+name+'. Revise antes de publicar; build interrompido.');
 for(const file of files)fs.copyFileSync(path.join(root,file),path.join(dest,file));
-console.log('Netlify: public/ contém somente assets. HTML privado e APIs são servidos pela Function app. Nenhuma publicação realizada.');
+console.log('Build: public/ contém somente assets. HTML privado e APIs são servidos pela Function. Nenhuma publicação realizada.');
+

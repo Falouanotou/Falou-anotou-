@@ -21,7 +21,8 @@ A versão agora depende deste servidor. Não use `python -m http.server` ou `npx
 - [Configuração completa de Supabase, Google OAuth, e-mails, variáveis e produção](CONFIGURACAO-AUTH.md)
 - [Roteiro de testes reais e limites do que foi validado](TESTES-AUTH.md)
 - [Estado atual da infraestrutura e pendências de homologação](INFRAESTRUTURA-ATUAL.md)
-- [Preparação Netlify: build, Functions, sessões e variáveis](CONFIGURACAO-NETLIFY.md)
+- [Hospedagem Vercel: build, sessões privadas e variáveis](CONFIGURACAO-VERCEL.md)
+- [Preparação anterior Netlify, preservada como referência](CONFIGURACAO-NETLIFY.md)
 - Minuta de Termos de Uso: **/termos-de-uso**
 - Minuta de Política de Privacidade: **/politica-de-privacidade**
 
@@ -35,7 +36,7 @@ Registros antigos continuam no navegador/origem anterior e não são apagados ne
 
 OCR e voz podem errar: revise sempre. A foto é processada no dispositivo; apenas dados confirmados são gravados na conta. Biblioteca/modelo OCR e fontes são baixados de provedores externos, e a voz pode usar serviço do navegador. Sem promessa de reconhecimento offline. O saldo é o dos registros, não saldo bancário.
 
-Nesta etapa a interface privada não é cacheada offline; o service worker remove caches antigos do app sem remover dados locais. Exclusão automatizada da conta completa, cobranças, SMTP de produção e validação da hospedagem pública continuam pendentes. A adaptação Netlify usa Functions e sessões compartilhadas criptografadas; siga `CONFIGURACAO-NETLIFY.md` para configurar e homologar.
+Nesta etapa a interface privada não é cacheada offline; o service worker remove caches antigos do app sem remover dados locais. Exclusão automatizada da conta completa, cobranças, SMTP de produção e validação da hospedagem pública continuam pendentes. A hospedagem escolhida agora é Vercel, com Function Node e sessões criptografadas em Blob privado; siga `CONFIGURACAO-VERCEL.md`. O repositório foi desconectado do projeto Netlify de testes.
 
 ## Testes e build
 

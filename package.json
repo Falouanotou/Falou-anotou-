@@ -4,22 +4,25 @@
   "private": true,
   "description": "Organizador financeiro com Supabase Auth e dados isolados por conta",
   "engines": {
-    "node": ">=22"
+    "node": "22.x"
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "lint": "node scripts/check.js",
-    "test": "node test-receipt-parser.js && node test-app.js && node --test tests/security.test.js tests/database.test.js tests/netlify.test.js",
+    "test": "node test-receipt-parser.js && node test-app.js && node --test tests/security.test.js tests/database.test.js tests/netlify.test.js tests/vercel.test.js",
     "test:browser": "node tests/auth-browser.js",
     "test:integration": "node tests/supabase-live.js",
     "check:connection": "node --env-file-if-exists=.env scripts/check-supabase-connection.js",
     "build": "node scripts/build.js",
     "build:netlify": "node scripts/build-netlify.js",
-    "env:netlify": "node --env-file-if-exists=.env scripts/create-netlify-env.js"
+    "env:netlify": "node --env-file-if-exists=.env scripts/create-netlify-env.js",
+    "build:vercel": "node scripts/build-netlify.js",
+    "env:vercel": "node --env-file-if-exists=.env scripts/create-vercel-env.js"
   },
   "dependencies": {
     "@netlify/blobs": "11.1.4",
-    "@supabase/supabase-js": "2.117.3"
+    "@supabase/supabase-js": "2.117.3",
+    "@vercel/blob": "2.8.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.9"

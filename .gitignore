@@ -8,3 +8,4 @@ qa/
 
 public/
 .netlify/
+.vercel/

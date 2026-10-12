@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "buildCommand": "npm run build:vercel",
+  "outputDirectory": "public",
+  "functions": {
+    "api/app.js": {
+      "maxDuration": 60,
+      "includeFiles": "{index.html,styles.css,auth.css,auth.js,account-api.js,app.js,finance-query.js,receipt-parser.js,receipt-ui.js,icon.svg,google-g.png,manifest.webmanifest,sw.js}"
+    }
+  },
+  "rewrites": [{"source": "/(.*)", "destination": "/api/app"}]
+}

@@ -1,0 +1,12 @@
+.env
+.env.*
+.runtime
+node_modules
+dist
+qa
+.netlify
+supabase
+tests
+netlify
+*.zip
+*.bundle
