@@ -1,0 +1,24 @@
+{
+  "name": "falou-anotou",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Organizador financeiro com Supabase Auth e dados isolados por conta",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "lint": "node scripts/check.js",
+    "test": "node test-receipt-parser.js && node test-app.js && node --test tests/security.test.js tests/database.test.js",
+    "test:browser": "node tests/auth-browser.js",
+    "test:integration": "node tests/supabase-live.js",
+    "check:connection": "node --env-file-if-exists=.env scripts/check-supabase-connection.js",
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.117.3"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.9"
+  }
+}

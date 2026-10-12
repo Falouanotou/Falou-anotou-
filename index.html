@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0b2421">
+  <meta name="description" content="Falou, Anotou! Organize suas finanças falando naturalmente.">
+  <title>Falou, Anotou! — Seu dinheiro, sem digitar</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="icon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="auth.css">
+  <script defer src="receipt-parser.js"></script>
+  <script defer src="finance-query.js"></script>
+  <script defer src="account-api.js"></script>
+  <script defer src="app.js"></script>
+  <script defer src="receipt-ui.js"></script>
+</head>
+<body data-account-ready="false">
+  <div class="shell">
+    <header class="topbar">
+      <a href="/app#inicio" class="brand" aria-label="Falou, Anotou! Início">
+        <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" fill="none"><rect x="4" y="4" width="32" height="32" rx="12" fill="#B8F4A7"/><path d="M20 11v18M14 15v10M26 15v10M9 18v4M31 18v4" stroke="#0B2421" stroke-width="2.8" stroke-linecap="round"/></svg></span>
+        <span>falou,<strong>anotou!</strong></span>
+      </a>
+      <div class="top-actions account-toolbar"><span id="accountDisplay" class="cloud-status"></span><a href="/conta">Minha conta</a><button id="exportBtn" class="button button-soft button-small" type="button">Exportar dados ↗</button><button id="accountLogout" class="button button-soft button-small" type="button">Sair</button></div>
+    </header>
+
+    <main id="inicio">
+      <p id="storageWarning" class="storage-warning" role="alert" hidden></p>
+      <section id="legacyMigration" class="legacy-migration panel" hidden><strong>Há registros da versão antiga neste aparelho.</strong><p>Seu histórico da conta foi carregado separadamente. Importe apenas se esses registros forem seus; nada será transferido ou apagado sem confirmação.</p><div><button id="legacyExportBtn" type="button" class="button button-soft">Exportar original local</button><button id="legacyImportBtn" type="button" class="button button-primary">Importar para minha conta</button><button id="legacyRemoveBtn" type="button" class="button button-soft" hidden>Remover cópia local já importada</button></div></section>
+      <section class="intro">
+        <div class="intro-copy">
+          <div class="eyebrow"><span class="shine"></span> FINANÇAS SEM COMPLICAÇÃO</div>
+          <h1>Seu dinheiro.<br><em>Na ponta da língua.</em></h1>
+          <p>Falou quanto gastou? A gente organiza. Quer saber para onde foi seu dinheiro? É só perguntar.</p>
+        </div>
+        <div class="intro-art" aria-hidden="true">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="intro-orb"><svg viewBox="0 0 100 100"><path d="M50 20v60M34 29v42M66 29v42M20 39v22M80 39v22" stroke="#0B2421" stroke-width="6" stroke-linecap="round"/></svg></div>
+          <div class="float-label float-label-one">"Gastei R$ 32 no almoço"</div>
+          <div class="float-label float-label-two">✓ Despesa registrada</div>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="Área financeira">
+        <div class="primary-col">
+          <div class="voice-card panel">
+            <div class="panel-top"><span class="section-label">SEU ASSISTENTE FINANCEIRO</span><span class="mini-chip">PORTUGUÊS · BR</span></div>
+            <div class="voice-stage">
+              <button class="mic-button" id="micBtn" aria-label="Começar reconhecimento de voz" title="Toque para falar" type="button">
+                <span class="mic-ripple"></span>
+                <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
+              </button>
+              <h2 id="voiceTitle">Toque e me conte</h2>
+              <p id="voiceHint" role="status">O que você comprou ou quer saber?</p>
+              <p class="transcript" id="transcript" aria-live="polite"></p>
+            </div>
+            <form id="commandForm" class="command-form">
+              <label for="commandInput" class="visually-hidden">Digite uma despesa, receita ou pergunta</label>
+              <input id="commandInput" autocomplete="off" placeholder="Ou digite: gastei 35 reais no mercado..." maxlength="360" enterkeyhint="send">
+              <button class="send-button" type="submit" aria-label="Interpretar comando">➜</button>
+            </form>
+            <div class="voice-tools">
+              <button type="button" id="dictationBtn" class="dictation-button">⌨ Usar ditado do teclado <span>No PC: Win + H</span></button>
+              <button type="button" id="voiceHelpToggle" class="voice-help-toggle" aria-expanded="false" aria-controls="voiceHelp">Problemas com o microfone?</button>
+            </div>
+            <section class="voice-help" id="voiceHelp" aria-live="polite" hidden>
+              <strong id="voiceHelpTitle">Como usar sua voz no computador</strong>
+              <p id="voiceHelpText">Se o microfone do site não funcionar, selecione o campo de texto e pressione as teclas Windows + H para ditar sua frase. Depois, clique na seta para registrar ou consultar.</p>
+              <div class="voice-help-actions">
+                <button type="button" id="voiceHelpDictation">Selecionar campo para ditar</button>
+                <button type="button" id="voiceHelpClose">Fechar</button>
+              </div>
+            </section>
+            <button type="button" id="receiptQuickCameraBtn" class="camera-shortcut">◉ Fotografar uma nota fiscal</button>
+            <div class="examples"><span>EXPERIMENTE:</span>
+              <button type="button" class="example" data-command="Gastei 35 reais no mercado hoje">+ Gastei R$ 35</button>
+              <button type="button" class="example" data-command="Quanto gastei esse mês?">? Gastos do mês</button>
+              <button type="button" class="example" data-command="Qual foi meu maior gasto este mês?">? Maior gasto</button>
+            </div>
+            <div class="listen-foot"><label class="toggle-row"><input id="readAloud" type="checkbox"><span class="toggle"></span> Ler respostas em voz alta</label><span id="speechSupport" class="support-label"></span></div>
+          </div>
+
+          <div class="answer-card panel" id="answerCard" aria-live="polite" hidden>
+            <div class="answer-head"><div class="answer-icon">✦</div><span>ENCONTREI PARA VOCÊ</span><button type="button" id="closeAnswer" aria-label="Fechar resultado">×</button></div>
+            <p id="answerText"></p>
+            <div id="answerDetails" class="answer-details"></div>
+          </div>
+        </div>
+
+        <aside class="summary-col">
+          <div class="month-card panel">
+            <div class="month-header"><span>VISÃO DO MÊS</span><span id="monthName"></span></div>
+            <div class="balance-label">Saldo registrado</div>
+            <div class="balance-number" id="balanceValue">R$ 0,00</div>
+            <div class="two-stats">
+              <div><span class="stat-type">↗ Receitas</span><strong id="incomeValue">R$ 0,00</strong></div>
+              <div><span class="stat-type">↘ Despesas</span><strong id="expenseValue">R$ 0,00</strong></div>
+            </div>
+            <div id="monthChart" class="month-chart" role="img" aria-label="Receitas e despesas deste mês"><div><span>Receitas</span><div class="chart-track"><span id="incomeBar"></span></div></div><div><span>Despesas</span><div class="chart-track"><span id="expenseBar"></span></div></div></div>
+          </div>
+          <div class="panel category-card">
+            <div class="panel-top"><h2>Onde você mais gastou</h2><span class="mini-chip">ESTE MÊS</span></div>
+            <div id="categoryBars" class="category-bars"></div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="receipt-card panel" id="nota-fiscal" aria-labelledby="receiptHeading">
+        <div class="receipt-header">
+          <div>
+            <span class="section-label">NOVO · LEITURA DE NOTAS FISCAIS</span>
+            <h2 id="receiptHeading">Fotografou. A gente anota.</h2>
+            <p>Fotografe seu cupom fiscal ou envie uma imagem. O aplicativo tenta identificar loja, data, valor e produtos automaticamente.</p>
+          </div>
+          <div class="receipt-illustration" aria-hidden="true">▤<span>✦</span></div>
+        </div>
+        <div class="receipt-actions">
+          <button type="button" class="button button-primary" id="receiptCameraBtn">◉ Tirar foto da nota</button>
+          <button type="button" class="button button-soft" id="receiptUploadBtn">↑ Enviar foto ou imagem</button>
+          <button type="button" class="button button-quiet" id="receiptManualBtn">Preencher manualmente</button>
+        </div>
+        <button type="button" id="receiptStopBtn" class="button button-soft" hidden>Cancelar leitura</button>
+        <input id="receiptCameraFile" type="file" accept="image/*" capture="environment" hidden>
+        <input id="receiptUploadFile" type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden>
+        <div class="receipt-status" id="receiptStatus" role="status" aria-live="polite">Dica: fotografe a nota inteira, sem reflexos, com o texto nítido.</div>
+        <div class="receipt-preview" id="receiptPreview" hidden>
+          <img id="receiptImage" alt="Prévia da nota fiscal selecionada">
+          <div><strong id="receiptFilename"></strong><p>Imagem usada só para a leitura. Ela não será salva no histórico.</p></div>
+        </div>
+        <div class="receipt-progress" id="receiptProgress" role="progressbar" aria-label="Leitura da nota" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><div id="receiptProgressFill"></div></div>
+        <form id="receiptForm" class="receipt-form" hidden>
+          <div class="receipt-form-title"><strong>Revise antes de registrar</strong><span class="mini-chip">CONFIRMAÇÃO OBRIGATÓRIA</span></div>
+          <p id="receiptWarnings" class="receipt-warnings" aria-live="polite"></p>
+          <div class="receipt-fields">
+            <label>Estabelecimento<input id="receiptMerchant" maxlength="100" placeholder="Nome do estabelecimento"></label>
+            <label>Data da compra<input id="receiptDate" type="date" required></label>
+            <label>Valor total (R$)<input id="receiptAmount" type="number" inputmode="decimal" step="0.01" min="0.01" max="1000000000" required placeholder="0,00"></label>
+            <label>Categoria<select id="receiptCategory"></select></label>
+            <label>Desconto geral (R$)<input id="receiptDiscount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Não identificado"></label>
+            <label>Acréscimo geral (R$)<input id="receiptSurcharge" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Não identificado"></label>
+          </div>
+          <label class="receipt-item-label" for="receiptItems">Produtos da nota <span>(opcional — um por linha)</span></label>
+          <p class="receipt-item-help">Formato: nome | quantidade | total do item | unidade (opcional). Ex.: Leite integral 1L | 2 | 13,98 | UN. Se a quantidade não foi reconhecida, deixe-a vazia. UN = embalagem/unidade; KG e L = peso e volume. Descontos gerais não são distribuídos entre produtos.</p>
+          <textarea id="receiptItems" maxlength="20000" rows="4" placeholder="Leite integral | 2 | 13,98&#10;Arroz | 1 | 5,90" spellcheck="false"></textarea>
+          <p id="receiptReconciliation" class="receipt-warnings" aria-live="polite"></p>
+          <p id="receiptUnitPrices" class="receipt-item-help"></p>
+          <details class="receipt-raw-details"><summary>Ver/corrigir o texto lido na foto</summary><label for="receiptRawText">Se houver erros na leitura, edite o texto e clique em “Interpretar novamente”.</label><textarea id="receiptRawText" maxlength="60000" rows="6" spellcheck="false"></textarea><button id="receiptReparseBtn" type="button" class="button button-soft button-small">Interpretar novamente</button></details>
+          <div class="receipt-form-actions"><button type="button" id="receiptCancelBtn" class="button button-soft">Cancelar</button><button type="submit" class="button button-primary">✓ Confirmar e registrar compra</button></div>
+        </form>
+        <p class="receipt-privacy">A leitura da imagem acontece neste dispositivo, usando uma biblioteca de OCR carregada pela internet. A foto não é enviada ao servidor deste app nem guardada no histórico. O OCR pode errar valores: confirme sempre.</p>
+      </section>
+
+      <section class="history panel" id="historico">
+        <div class="history-head"><div><span class="section-label">TUDO REGISTRADO</span><h2>Seus lançamentos</h2></div><div class="history-actions"><button type="button" class="button button-soft button-small" id="demoBtn">Inserir dados de exemplo</button><button type="button" class="button button-soft button-small" id="importBtn">Importar backup</button></div></div>
+        <div class="search-row"><label class="visually-hidden" for="searchInput">Pesquisar lançamentos</label><span aria-hidden="true">⌕</span><input id="searchInput" placeholder="Buscar loja, produto, categoria, valor..." autocomplete="off"><span class="search-count" id="recordCount">0 registros</span></div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+      <section class="trust-note"><span aria-hidden="true">◈</span><p><strong>Seus dados são seus.</strong> Este aplicativo não acessa contas bancárias. Registros confirmados ficam no banco associado à sua conta autenticada. O reconhecimento de voz pode usar serviços do navegador e exigir internet. Faça backups dos seus registros; a cópia antiga local só é importada se você confirmar.</p></section>
+    </main>
+    <footer>Falou, Anotou! <span>Não substitui extratos bancários.</span><a id="termsAccountLink" href="/termos-de-uso">Termos de Uso</a><a id="privacyAccountLink" href="/politica-de-privacidade">Política de Privacidade</a></footer>
+  </div>
+
+  <dialog id="reviewDialog" class="review-dialog">
+    <form id="reviewForm" method="dialog">
+      <div class="modal-header"><div><span class="section-label">CONFIRME ANTES DE SALVAR</span><h2>Entendi assim...</h2></div><button type="button" class="modal-close" id="cancelReview" aria-label="Cancelar lançamento">×</button></div>
+      <div class="review-grid">
+        <label class="full">Tipo<select id="reviewType" required><option value="expense">Despesa</option><option value="income">Receita</option></select></label>
+        <label>Valor (R$)<input id="reviewAmount" type="number" inputmode="decimal" step="0.01" min="0.01" max="1000000000" required></label>
+        <label>Data<input id="reviewDate" type="date" required></label>
+        <label class="full">Loja / pessoa / origem<input id="reviewMerchant" maxlength="100" placeholder="Ex.: Mercado do bairro"></label>
+        <label class="full">Descrição<input id="reviewDescription" maxlength="200" placeholder="Ex.: Almoço de domingo"></label>
+        <label class="full">Categoria<select id="reviewCategory"></select></label>
+      </div>
+      <div class="modal-actions"><button class="button button-soft" id="backReview" type="button">Voltar</button><button type="submit" class="button button-primary">Confirmar e salvar ✓</button></div>
+    </form>
+  </dialog>
+  <input type="file" id="importFile" accept="application/json,.json" hidden>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
