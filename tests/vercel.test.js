@@ -10,7 +10,24 @@ class FakeVercelSDK {
  async list({prefix}){return {blobs:[...this.data.keys()].filter(k=>k.startsWith(prefix)).map(pathname=>({pathname})),hasMore:false};}
 }
 const env=()=>({APP_ENV:'development',APP_ORIGIN:'https://fixture.vercel.app',SUPABASE_URL:'https://fixture.supabase.co',SUPABASE_PUBLISHABLE_KEY:'sb_publishable_fixture',SESSION_SECRET:crypto.randomBytes(32).toString('base64')});
+test('Revogação Blob é idempotente e não restaura sessão removida',async()=>{
+ const sdk=new FakeVercelSDK(),config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
+ const session=await store.rotate(response(),null,{user:{id:'fixture'}});await store.remove(session.id);await store.remove(session.id);assert.equal(await store.read(session.id),null);
+});
+test('Falha transitória na liberação do lock é repetida somente pelo próprio dono',async()=>{
+ const sdk=new FakeVercelSDK(),put=sdk.put.bind(sdk);let failed=false;
+ sdk.put=async(key,body,options)=>{if(!failed&&key.includes('/locks/')&&JSON.parse(JSON.parse(body).data).owner===''){failed=true;throw new BlobPreconditionFailedError();}return put(key,body,options);};
+ const config=configuration({...env(),NODE_ENV:'development'}),store=new BlobSessionStore(config,new VercelBlobs(sdk,'testes'));
+ await store.locked('fixture',async()=>{});assert.equal(failed,true);await store.locked('fixture',async()=>{});
+});
 const response=()=>({headers:{},status:200,headersSent:false,setHeader(k,v){this.headers[k.toLowerCase()]=v;},writeHead(status,headers={}){this.status=status;for(const[k,v]of Object.entries(headers))this.setHeader(k,v);this.headersSent=true;},end(body){this.body=body?Buffer.from(body).toString():'';}});
+test('Resposta só termina depois da liberação do lock distribuído',async()=>{
+ const res=response(),config=configuration({...env(),NODE_ENV:'development'});let released=false;
+ const store={cookie(){return null;},async read(){return null;},async anonymous(){return {csrf:'fixture',storage:{}};},async locked(id,operation){await operation();assert.equal(res.headersSent,false);released=true;}};
+ const auth={async limited(){},publicConfig(){return {development:true};}};
+ await require('../server').createHandler(config,{store,auth})({method:'GET',url:'/api/auth/session',headers:{host:config.host},socket:{remoteAddress:'fixture'}},res);
+ assert.equal(released,true);assert.equal(res.status,200);assert.equal(res.headersSent,true);assert.equal(JSON.parse(res.body).csrf,'fixture');
+});
 test('Vercel privado: leituras sem cache, CAS e sessão criptografada entre workers',async()=>{
  const sdk=new FakeVercelSDK(),settings=configuration({...env(),NODE_ENV:'development'}),a=new BlobSessionStore(settings,new VercelBlobs(sdk,'testes')),b=new BlobSessionStore(settings,new VercelBlobs(sdk,'testes'));
  const res=response(),s=await a.anonymous(res);s.storage.secret='PRIVATE-FIXTURE';await a.write(s);assert.ok(!JSON.stringify([...sdk.data]).includes('PRIVATE-FIXTURE'));assert.match(res.headers['set-cookie'],/^__Host-fa-session=.*HttpOnly.*Secure/);

@@ -25,7 +25,12 @@ function createHandler(config=configuration(),options={}){
         if(modes[route]){html(res,pages.authPage(modes[route],config));return;}
       }
       const existingId=store.cookie(req);
+      // Finish the distributed lock release before flushing the HTTP response.
+      // Serverless workers may stop after res.end(), abandoning awaited cleanup.
+      let pendingResponse;
+      const lockedResponse={setHeader:(name,value)=>res.setHeader(name,value),writeHead(status,headers={}){pendingResponse={status,headers};},end(body){if(!pendingResponse)throw Error('Resposta sem status.');pendingResponse.body=body;}};
       await store.locked(existingId||'anonymous-'+req.socket.remoteAddress,async()=>{
+        const res=lockedResponse;
         let session=await store.read(existingId);
         if(route==='/api/auth/session'&&req.method==='GET'){
           if(!session){await auth.limited(req,'anonymous',120);session=await store.anonymous(res);}
@@ -69,7 +74,9 @@ function createHandler(config=configuration(),options={}){
         }
         throw new ApiError(404,'Página não encontrada.');
       });
+      if(pendingResponse){res.writeHead(pendingResponse.status,pendingResponse.headers);res.end(pendingResponse.body);}
     }catch(error){
+      if(error.status>=500&&/^((session|blob)_[a-zA-Z_]+)$/.test(error.safeCode||''))console.error(JSON.stringify({event:'session_failure',code:error.safeCode}));
       if(res.headersSent){res.end();return;}
       const status=error.status||500,message=error.status?error.message:status===400?'Confira os dados informados.':'Não consegui concluir a solicitação.';
       if(url?.pathname.startsWith('/api/'))json(res,status,{error:message});

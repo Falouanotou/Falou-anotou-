@@ -1,13 +1,13 @@
 'use strict';
 const crypto=require('node:crypto');
 const {SessionStore}=require('./session-store');
-const unavailable=()=>Object.assign(Error('A sessão está ocupada ou o armazenamento não respondeu. Tente novamente.'),{status:503});
+const unavailable=(safeCode='session_storage_unavailable')=>Object.assign(Error('A sessão está ocupada ou o armazenamento não respondeu. Tente novamente.'),{status:503,safeCode});
 class BlobSessionStore{
  constructor(config,blobs){
   this.key=Buffer.from(config.secret||'','base64');if(this.key.length!==32)throw Error('Armazenamento de sessão exige SESSION_SECRET base64 de 32 bytes.');
   this.days=config.sessionDays;this.secure=config.secure;if(!this.secure)throw Error('Armazenamento de sessão exige HTTPS.');
   this.cookieName='__Host-fa-session';this.blobs={};
-  for(const method of ['get','getWithMetadata','set','setJSON','delete'])this.blobs[method]=async(...args)=>{try{return await blobs[method](...args);}catch{throw unavailable();}};
+  for(const method of ['get','getWithMetadata','set','setJSON','delete'])this.blobs[method]=async(...args)=>{try{return await blobs[method](...args);}catch{throw unavailable('blob_'+method+'_failed');}};
   this.blobs.list=async function*(options){try{yield* blobs.list(options);}catch{throw unavailable();}};
   this.etags=new Map();this.revoked=new Set();this.lease=null;
  }
@@ -18,7 +18,7 @@ class BlobSessionStore{
  digest(value){return crypto.createHmac('sha256',this.key).update(value).digest('hex');}
  sessionKey(id){if(!/^[a-f0-9]{64}$/.test(id))throw Error('Identificador de sessão inválido.');return 'sessions/'+this.digest(id);}
  async epoch(userId){return await this.blobs.get('epochs/'+this.digest(userId),{type:'text',consistency:'strong'})||'0';}
- assertLease(){if(this.lease&&this.lease.until<=Date.now())throw unavailable();}
+ assertLease(){if(this.lease&&this.lease.until<=Date.now())throw unavailable('session_lease_expired');}
  async read(id){
   if(!id)return null;const key=this.sessionKey(id),entry=await this.blobs.getWithMetadata(key,{type:'text',consistency:'strong'});if(!entry)return null;
   this.etags.set(id,entry.etag);let data;try{data=this.unseal(entry.data);}catch{return null;}
@@ -30,13 +30,13 @@ class BlobSessionStore{
   this.assertLease();if(this.revoked.has(data.id))throw unavailable();
   if(data.auth?.user?.id&&data.userEpoch!==await this.epoch(data.auth.user.id))throw Object.assign(Error('Entre novamente para continuar.'),{status:401});
   const etag=this.etags.get(data.id),result=await this.blobs.set(this.sessionKey(data.id),this.seal(data),{metadata:{expires:data.expires},...(etag?{onlyIfMatch:etag}:{onlyIfNew:true})});
-  if(!result.modified||!result.etag)throw unavailable();this.etags.set(data.id,result.etag);
+  if(!result.modified||!result.etag)throw unavailable('session_write_conflict');this.etags.set(data.id,result.etag);
  }
  async remove(id){
-  if(!id)return;this.assertLease();let etag=this.etags.get(id);
+  if(!id||this.revoked.has(id))return;this.assertLease();let etag=this.etags.get(id);
   if(!etag){const current=await this.blobs.getWithMetadata(this.sessionKey(id),{type:'text',consistency:'strong'});if(!current)return;etag=current.etag;}
   const expires=Date.now()+86400000,result=await this.blobs.set(this.sessionKey(id),this.seal({id,revoked:true,expires}),{onlyIfMatch:etag,metadata:{expires}});
-  if(!result.modified)throw unavailable();this.revoked.add(id);
+  if(!result.modified)throw unavailable('session_revoke_conflict');this.etags.set(id,result.etag);this.revoked.add(id);
  }
  async anonymous(res){const data={id:crypto.randomBytes(32).toString('hex'),csrf:crypto.randomBytes(32).toString('hex'),created:Date.now(),expires:Date.now()+3600000,storage:{}};await this.write(data);this.setCookie(res,data.id,3600);return data;}
  async rotate(res,old,auth,extra={}){
@@ -55,11 +55,16 @@ class BlobSessionStore{
    }
    await new Promise(resolve=>setTimeout(resolve,100));
   }while(Date.now()<deadline);
-  if(!lease)throw unavailable();this.lease=lease;
+  if(!lease)throw unavailable('session_lock_timeout');this.lease=lease;
   try{return await operation();}finally{
    this.lease=null;
    // Conditional release cannot clear a lock already acquired by another worker.
-   try{await this.blobs.setJSON(key,{owner:'',until:0},{onlyIfMatch:lease.etag,metadata:{expires:Date.now()+86400000}});}catch{/* The bounded lease expires without bypassing access control. */}
+   let etag=lease.etag,released=false;
+   for(let attempt=0;attempt<2&&!released;attempt++){
+    try{released=(await this.blobs.setJSON(key,{owner:'',until:0},{onlyIfMatch:etag,metadata:{expires:Date.now()+86400000}})).modified;if(released)break;}catch{/* Retry only while we still own this bounded lease. */}
+    try{const current=await this.blobs.getWithMetadata(key,{type:'json',consistency:'strong'});if(!current||current.data.owner!==owner)return;etag=current.etag;}catch{break;}
+   }
+   if(!released)console.error(JSON.stringify({event:'session_failure',code:'session_lock_release_failed'}));
   }
  }
  async rateLimit(ip,route,maximum){
