@@ -53,7 +53,9 @@ function createHandler(config=configuration(),options={}){
           }
         }
         if(route.startsWith('/api/')){
-          if(req.method==='POST')auth.csrf(req,session);
+          if(req.method==='POST'){
+            try{auth.csrf(req,session);}catch(error){if(route==='/api/auth/confirm'&&error.status===403)error.safeCode='recovery_context_incompatible';throw error;}
+          }
           let privateContext; if(route==='/api/ledger'||route==='/api/ledger/changes'||route.startsWith('/api/account')){privateContext=await auth.private(session);guard(req.headers['x-account-context']===privateContext.user.id,401,'A conta mudou em outra guia. Entre novamente.');}
           if(route==='/api/ledger'&&req.method==='GET'){json(res,200,await auth.ledger(session,privateContext));return;}
           if(route==='/api/ledger/changes'&&req.method==='POST'){json(res,200,await auth.changes(session,await readJson(req,16*1024*1024),privateContext));return;}
@@ -77,8 +79,9 @@ function createHandler(config=configuration(),options={}){
       if(pendingResponse){res.writeHead(pendingResponse.status,pendingResponse.headers);res.end(pendingResponse.body);}
     }catch(error){
       if(error.status>=500&&/^((session|blob)_[a-zA-Z_]+)$/.test(error.safeCode||''))console.error(JSON.stringify({event:'session_failure',code:error.safeCode}));
+      if(/^recovery_(flow_missing|verifier_missing|flow_expired|context_incompatible|link_invalid_or_used)$/.test(error.safeCode||''))console.error(JSON.stringify({event:'auth_recovery_failure',code:error.safeCode}));
       if(res.headersSent){res.end();return;}
-      const status=error.status||500,message=error.status?error.message:status===400?'Confira os dados informados.':'Não consegui concluir a solicitação.';
+      const status=error.status||500,isConfirmation=url?.pathname==='/api/auth/confirm',message=isConfirmation&&status<500?'Não foi possível validar este link. Ele pode ter expirado, já ter sido utilizado ou não corresponder a esta solicitação. Peça um novo link de recuperação.':error.status?error.message:status===400?'Confira os dados informados.':'Não consegui concluir a solicitação.';
       if(url?.pathname.startsWith('/api/'))json(res,status,{error:message});
       else html(res,pages.authPage('login',config),status);
     }

@@ -2,8 +2,9 @@
 const {createClient}=require('@supabase/supabase-js');
 const crypto=require('node:crypto');
 const {validateBatch}=require('./ledger-schema');
-class ApiError extends Error{constructor(status,message){super(message);this.status=status;}}
-const guard=(condition,status,message)=>{if(!condition)throw new ApiError(status,message);};
+class ApiError extends Error{constructor(status,message,safeCode){super(message);this.status=status;if(safeCode)this.safeCode=safeCode;}}
+const guard=(condition,status,message,safeCode)=>{if(!condition)throw new ApiError(status,message,safeCode);};
+const RECOVERY_LINK_MESSAGE='Não foi possível validar este link. Ele pode ter expirado, já ter sido utilizado ou não corresponder a esta solicitação. Peça um novo link de recuperação.';
 const constantEqual=(a,b)=>typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&crypto.timingSafeEqual(Buffer.from(a),Buffer.from(b));
 class AuthService{
   constructor(config,store,clientFactory=createClient){this.config=config;this.store=store;this.clientFactory=clientFactory;this.rates=new Map();}
@@ -58,24 +59,31 @@ class AuthService{
   captureEmailFlow(session,before,type,email){
     // SDK pinned in lockfile: retain the new per-flow verifier, never a client flow ID.
     const key=Object.keys(session.storage).find(k=>!before.has(k)&&/^fa-server-auth-flow-[a-zA-Z0-9_-]+-code-verifier$/.test(k));
-    if(key)session.emailFlow={type,email,flowId:key.slice('fa-server-auth-flow-'.length,-'-code-verifier'.length),until:Date.now()+3600000};
+    if(key)session.emailFlow={type,email,flowId:key.slice('fa-server-auth-flow-'.length,-'-code-verifier'.length),until:Date.now()+5*60*1000};
+    return !!key;
   }
-  async forgot(req,session,body){this.ready();guard(this.config.recoveryEnabled,503,'A recuperação por e-mail ainda não foi validada. Procure o responsável pela contratação.');await this.limited(req,'forgot');const email=this.email(body.email),client=this.client(session),before=new Set(Object.keys(session.storage));const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:this.config.origin+'/auth/confirm'});delete session.emailFlow;if(!error)this.captureEmailFlow(session,before,'recovery',email);await this.store.write(session);return {message:'Se este e-mail puder receber uma recuperação, enviaremos as instruções. Confira também a pasta de spam.'};}
+  async forgot(req,session,body){this.ready();guard(this.config.recoveryEnabled,503,'A recuperação por e-mail ainda não foi validada. Procure o responsável pela contratação.');await this.limited(req,'forgot');const email=this.email(body.email),client=this.client(session),before=new Set(Object.keys(session.storage));const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:this.config.origin+'/auth/confirm'});delete session.emailFlow;if(!error&&!this.captureEmailFlow(session,before,'recovery',email)){await this.store.write(session);throw new ApiError(503,'Se este e-mail puder receber uma recuperação, enviaremos as instruções. Confira também a pasta de spam.','recovery_verifier_missing');}await this.store.write(session);return {message:'Se este e-mail puder receber uma recuperação, enviaremos as instruções. Confira também a pasta de spam.'};}
   async confirm(res,session,body){
     this.ready();const client=this.client(session);let result,type;
     if(body.code){
       const flow=session.emailFlow;
-      guard(flow&&flow.until>Date.now()&&session.storage?.[`fa-server-auth-flow-${flow.flowId}-code-verifier`],400,'Abra o link no mesmo navegador em que fez a solicitação. Se o prazo venceu, solicite outro link.');
-      guard(typeof body.code==='string'&&body.code.length<=2048&&!/\s/.test(body.code)&&(!body.flowId||constantEqual(body.flowId,flow.flowId)),400,'Link de confirmação inválido.');
+      guard(flow,400,RECOVERY_LINK_MESSAGE,'recovery_flow_missing');
+      guard(flow.until>Date.now(),400,RECOVERY_LINK_MESSAGE,'recovery_flow_expired');
+      const verifierKey=`fa-server-auth-flow-${flow.flowId}-code-verifier`;
+      guard(typeof session.storage?.[verifierKey]==='string'&&session.storage[verifierKey].length>0,400,RECOVERY_LINK_MESSAGE,'recovery_verifier_missing');
+      guard(typeof body.code==='string'&&body.code.length<=2048&&!/\s/.test(body.code),400,RECOVERY_LINK_MESSAGE,'recovery_link_invalid_or_used');
+      guard(!body.flowId||constantEqual(body.flowId,flow.flowId),400,RECOVERY_LINK_MESSAGE,'recovery_context_incompatible');
       type=flow.type;
       result=await client.auth.exchangeCodeForSession(body.code,{flowId:flow.flowId});
-      guard(!result.error&&result.data?.user?.email?.toLowerCase()===flow.email,400,'O link expirou, já foi utilizado ou não corresponde a esta solicitação.');
+      guard(!result.error,400,RECOVERY_LINK_MESSAGE,'recovery_link_invalid_or_used');
+      guard(result.data?.user?.email?.toLowerCase()===flow.email,400,RECOVERY_LINK_MESSAGE,'recovery_context_incompatible');
       delete session.emailFlow;
     }else{
       guard(['email','recovery'].includes(body.type)&&typeof body.tokenHash==='string'&&/^[a-f0-9]{32,128}$/i.test(body.tokenHash),400,'Link de confirmação inválido.');
       type=body.type;result=await client.auth.verifyOtp({type,token_hash:body.tokenHash});
+      if(type==='recovery')guard(!result.error,400,RECOVERY_LINK_MESSAGE,'recovery_link_invalid_or_used');
     }
-    const {data,error}=result;guard(!error&&data.session&&data.user?.email_confirmed_at,400,'O link expirou ou já foi utilizado. Solicite outro.');
+    const {data,error}=result;guard(!error&&data.session&&data.user?.email_confirmed_at,400,type==='recovery'?RECOVERY_LINK_MESSAGE:'O link expirou ou já foi utilizado. Solicite outro.',type==='recovery'?'recovery_link_invalid_or_used':undefined);
     if(type==='recovery'){await this.store.rotate(res,session,data.session,{recovery:Date.now()+900000});return {redirect:'/nova-senha'};}
     await client.auth.signOut({scope:'local'});await this.store.remove(session.id);this.store.setCookie(res,'',0);return {redirect:'/login?notice=confirmed'};
   }

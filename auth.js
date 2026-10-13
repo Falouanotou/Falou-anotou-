@@ -14,6 +14,8 @@
   const accessToken=fragment.get('access_token')||params.get('access_token'),refreshToken=fragment.get('refresh_token')||params.get('refresh_token'),linkType=fragment.get('type')||params.get('type');
   let recoveryTokens=accessToken||refreshToken?{type:linkType,accessToken,refreshToken}:null;
   const linkError=fragment.get('error_code')||params.get('error_code')||fragment.get('error')||params.get('error');
+  const recoveryCallback=mode==='confirm'||!!recoveryTokens||!!linkError;
+  const recoveryFailure=()=>{message('Não foi possível validar este link. Ele pode ter expirado, já ter sido utilizado ou não corresponder a esta solicitação. Solicite um novo link de recuperação.',true);if($('authSubmit'))$('authSubmit').hidden=true;if($('recoveryRetry'))$('recoveryRetry').hidden=false;$('authForm')?.removeAttribute('aria-busy');};
   if(mode==='confirm'||recoveryTokens||linkError)history.replaceState(null,'',location.pathname);
   if(mode==='confirm'||recoveryTokens){$('authSubmit').disabled=true;message('Validando o link…');}
   try{
@@ -52,5 +54,5 @@
       $('accountForm').addEventListener('submit',event=>{event.preventDefault();execute(async()=>navigate(await api('/api/account',{name:$('accountName').value.trim(),readAloud:$('accountReadAloud').checked})));});
       $('categoryForm').addEventListener('submit',event=>{event.preventDefault();execute(async()=>{navigate(await api('/api/account/category',{name:$('categoryName').value.trim()}));$('categoryName').value='';});});
     }
-  }catch(error){message(error.message||'Não consegui carregar a conta. Recarregue a página.',true);}
+  }catch(error){if(recoveryCallback){recoveryFailure();return;}message(error.message||'Não consegui carregar a conta. Recarregue a página.',true);}
 })();
