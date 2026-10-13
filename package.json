@@ -15,6 +15,7 @@
     "check:connection": "node --env-file-if-exists=.env scripts/check-supabase-connection.js",
     "build": "node scripts/build.js",
     "build:vercel": "node scripts/build-public.js",
+    "test:header": "node tests/header-browser.js",
     "env:vercel": "node --env-file-if-exists=.env scripts/create-vercel-env.js",
     "test:pwa": "node tests/pwa-browser.js"
   },

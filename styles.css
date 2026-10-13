@@ -75,6 +75,31 @@ button:active{filter:brightness(.94)}
 @media(pointer:coarse){input,textarea,select,.command-form input,.search-row input,.review-grid input,.review-grid select,.receipt-form textarea{font-size:16px}.button,.example,.send-button,.del-entry,.modal-close,.voice-help-actions button,.dictation-button,.voice-help-toggle,.answer-head button{min-height:44px;min-width:44px}.shell{padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}}
 @media(max-width:400px){.entry{flex-wrap:wrap}.entry-info{flex-basis:calc(100% - 60px)}.entry-value{margin-left:46px}.del-entry{margin-left:auto}.listen-foot{flex-wrap:wrap}.support-label{text-align:left}.receipt-header{align-items:flex-start}.receipt-illustration{display:none}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+
+/* A conta mantém as mesmas ações no desktop; em telas estreitas elas viram um painel ancorado. */
+.topbar{position:relative}
+.mobile-account-menu-toggle{display:none}
+.account-menu-icon-close{display:none}
+@media(max-width:580px){
+  .topbar{gap:10px;overflow:visible}
+  .brand{flex:1 1 auto;min-width:0;white-space:normal;line-height:1.12;letter-spacing:-.6px}
+  .brand-mark{flex:0 0 36px}
+  .mobile-account-menu-toggle{flex:0 0 44px;width:44px;height:44px;display:grid;place-items:center;padding:0;border:1px solid #e1e9df;border-radius:13px;background:#eaf0e9;color:#24483e;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  .mobile-account-menu-toggle:active{background:#dce9db}
+  .mobile-account-menu-toggle:focus-visible,.account-toolbar a:focus-visible,.account-toolbar button:focus-visible{outline:3px solid #6ca878;outline-offset:2px}
+  .topbar[data-account-menu-open="true"] .account-menu-icon-open{display:none}
+  .topbar[data-account-menu-open="true"] .account-menu-icon-close{display:block}
+  .topbar .account-toolbar{display:none;position:absolute;z-index:20;top:calc(100% - 4px);right:0;width:min(240px,calc(100vw - 24px));padding:8px;flex-direction:column;align-items:stretch;gap:5px;border:1px solid #e2e9e0;border-radius:16px;background:#fff;box-shadow:0 14px 36px #14292524}
+  .topbar[data-account-menu-open="true"] .account-toolbar{display:flex}
+  #accountDisplay{display:none}
+  .topbar .account-toolbar a,.topbar .account-toolbar button{display:flex;align-items:center;width:100%;min-height:48px;padding:12px 14px;border:0;border-radius:11px;text-align:left;text-decoration:none;font:inherit;font-size:15px;font-weight:600;line-height:1.35;color:#24483e;background:transparent}
+  .topbar .account-toolbar a:active,.topbar .account-toolbar button:active{background:#f0f5ee}
+}
+@media(max-width:360px){
+  .topbar{gap:7px}
+  .brand{font-size:16px}
+  .brand-mark{flex-basis:34px;width:34px;height:34px}
+}
 /* Acesso à câmera dentro da barra de comando; usa o fluxo de notas existente. */
 .command-camera-button{display:grid;place-items:center;flex-shrink:0;width:39px;height:39px;padding:0;border:0;border-radius:10px;background:#eaf0e9;color:#24483e;touch-action:manipulation}
 .command-form .send-button{flex-shrink:0}

@@ -267,6 +267,12 @@ $('exportBtn').addEventListener('click',()=>{if(window.confirm('Exportar também
 $('importBtn').addEventListener('click',()=>$('importFile').click());$('importFile').addEventListener('change',event=>importBackup(event.target.files[0]));
 $('demoBtn').addEventListener('click',toggleDemo);
 $('readAloud').checked=false;
+const accountMenuToggle=$('accountMenuToggle'),accountToolbar=$('accountToolbar'),accountMenuTopbar=accountMenuToggle.closest('.topbar');
+function setAccountMenuOpen(open){accountMenuTopbar.dataset.accountMenuOpen=String(open);accountMenuToggle.setAttribute('aria-expanded',String(open));accountMenuToggle.setAttribute('aria-label',open?'Fechar menu da conta':'Abrir menu da conta');}
+accountMenuToggle.addEventListener('click',()=>setAccountMenuOpen(accountMenuTopbar.dataset.accountMenuOpen!=='true'));
+document.addEventListener('click',event=>{if(accountMenuTopbar.dataset.accountMenuOpen==='true'&&!accountMenuTopbar.contains(event.target))setAccountMenuOpen(false);});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'&&accountMenuTopbar.dataset.accountMenuOpen==='true'){setAccountMenuOpen(false);accountMenuToggle.focus();}});
+accountToolbar.addEventListener('click',event=>{if(event.target.closest('a,button'))setAccountMenuOpen(false);});
 let legacyReceipt=null;
 function legacyRaw(){try{return localStorage.getItem(STORAGE_KEY);}catch{return null;}}
 function showLegacy(){const raw=legacyRaw();$('legacyMigration').hidden=!raw||raw==='[]';}
