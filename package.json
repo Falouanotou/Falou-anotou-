@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.js",
     "lint": "node scripts/check.js",
-    "test": "node test-receipt-parser.js && node test-app.js && node --test tests/security.test.js tests/database.test.js tests/vercel.test.js tests/public-access.test.js",
+    "test": "node test-receipt-parser.js && node test-app.js && node --test tests/security.test.js tests/database.test.js tests/vercel.test.js tests/public-access.test.js tests/recovery-operations.test.js",
     "test:browser": "node tests/auth-browser.js",
     "test:integration": "node tests/supabase-live.js",
     "check:connection": "node --env-file-if-exists=.env scripts/check-supabase-connection.js",

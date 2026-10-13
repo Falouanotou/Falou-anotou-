@@ -2,15 +2,30 @@
 (async()=>{
   const mode=document.querySelector('[data-auth-mode]')?.dataset.authMode;if(!mode)return;
   const $=id=>document.getElementById(id),message=(text,error=false)=>{const el=$('authMessage');el.textContent=text;el.classList.toggle('is-error',error);};
+  // Install synchronously: a click during session initialization must never submit
+  // the native form and discard the callback credentials from the current page.
+  $('authForm')?.addEventListener('submit',event=>event.preventDefault());
   let state,busy=false;
   const api=async(route,body)=>{const headers={'X-Account-Context':state?.user?.id||''};if(body){headers['Content-Type']='application/json';headers['X-CSRF-Token']=state?.csrf||'';}const response=await fetch(route,{method:body?'POST':'GET',credentials:'same-origin',cache:'no-store',headers,body:body?JSON.stringify(body):undefined});const data=await response.json();if(!response.ok)throw Error(data.error||'Não consegui concluir. Tente novamente.');return data;};
   const execute=async(operation)=>{if(busy)return;busy=true;message('Aguarde…');const buttons=[...document.querySelectorAll('button')];buttons.forEach(b=>{b.disabled=true;});$('authForm')?.setAttribute('aria-busy','true');try{await operation();}catch(error){message(error instanceof TypeError?'A conexão falhou. Confira sua conexão e tente novamente.':error.message||'Não consegui concluir. Tente novamente.',true);}finally{busy=false;buttons.forEach(b=>{b.disabled=false;});$('authForm')?.removeAttribute('aria-busy');}};
   const navigate=data=>{if(data.redirect)location.assign(data.redirect);else if(data.url)location.assign(data.url);else message(data.message);};
   // Remove bearer confirmation hashes from the visible URL before any further navigation.
-  const params=new URLSearchParams(location.search),confirmation={tokenHash:params.get('token_hash'),type:params.get('type'),code:params.get('code'),flowId:params.get('sb_flow_id')};
-  if(mode==='confirm')history.replaceState(null,'',location.pathname);
+  const params=new URLSearchParams(location.search),fragment=new URLSearchParams(location.hash.slice(1)),confirmation={tokenHash:params.get('token_hash'),type:params.get('type'),code:params.get('code'),flowId:params.get('sb_flow_id')};
+  const accessToken=fragment.get('access_token')||params.get('access_token'),refreshToken=fragment.get('refresh_token')||params.get('refresh_token'),linkType=fragment.get('type')||params.get('type');
+  let recoveryTokens=accessToken||refreshToken?{type:linkType,accessToken,refreshToken}:null;
+  const linkError=fragment.get('error_code')||params.get('error_code')||fragment.get('error')||params.get('error');
+  if(mode==='confirm'||recoveryTokens||linkError)history.replaceState(null,'',location.pathname);
+  if(mode==='confirm'||recoveryTokens){$('authSubmit').disabled=true;message('Validando o link…');}
   try{
     state=await api('/api/auth/session');
+    if(linkError)throw Error('O Supabase informou que o link não pôde ser validado. Ele pode ter expirado ou já ter sido utilizado. Solicite um novo link pelo suporte.');
+    if(recoveryTokens){
+      try{if(recoveryTokens.type!=='recovery')throw Error('O link não é de recuperação. Solicite um novo link pelo suporte.');navigate(await api('/api/auth/recovery-session',recoveryTokens));}
+      finally{recoveryTokens=null;}
+      return;
+    }
+    if(mode==='confirm'&&(confirmation.tokenHash||confirmation.code)){navigate(await api('/api/auth/confirm',confirmation));return;}
+    if(mode==='confirm')throw Error('Este endereço não contém os dados de recuperação. Abra novamente o link completo da mensagem mais recente, uma única vez.');
     if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
     if(['login','signup'].includes(mode)&&state.user&&params.get('notice')!=='setup-required'){location.replace(state.recovery?'/nova-senha':state.needsConsent?'/aceitar-documentos':'/app');return;}
     if(['consent','reset','account'].includes(mode)&&!state.user){location.replace('/login');return;}

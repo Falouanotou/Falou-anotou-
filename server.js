@@ -68,7 +68,7 @@ function createHandler(config=configuration(),options={}){
           if(route==='/api/account/category'&&req.method==='POST'){
             const {client}=privateContext,body=await readJson(req);guard(typeof body.name==='string'&&body.name.trim().length>0&&body.name.trim().length<=60&&Object.keys(body).length===1,400,'Categoria inválida.');const {error}=await client.from('custom_categories').insert({name:body.name.trim()});guard(!error,409,'Essa categoria já existe ou não pôde ser criada.');json(res,200,{message:'Categoria adicionada.'});return;
           }
-          const actions={'/api/auth/login':()=>auth.login(req,res,session,body),'/api/auth/signup':()=>auth.signup(req,res,session,body),'/api/auth/forgot':()=>auth.forgot(req,session,body),'/api/auth/confirm':()=>auth.confirm(res,session,body),'/api/auth/reset':()=>auth.reset(res,session,body),'/api/auth/accept':()=>auth.accept(session,body),'/api/auth/logout':()=>auth.logout(res,session)};
+          const actions={'/api/auth/login':()=>auth.login(req,res,session,body),'/api/auth/signup':()=>auth.signup(req,res,session,body),'/api/auth/forgot':()=>auth.forgot(req,session,body),'/api/auth/confirm':()=>auth.confirm(res,session,body),'/api/auth/recovery-session':()=>auth.recoverySession(req,res,session,body),'/api/auth/reset':()=>auth.reset(res,session,body),'/api/auth/accept':()=>auth.accept(session,body),'/api/auth/logout':()=>auth.logout(res,session)};
           let body;
           if(actions[route]&&req.method==='POST'){body=await readJson(req);json(res,200,await actions[route]());return;}
         }

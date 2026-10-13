@@ -1,0 +1,68 @@
+# Operação de recuperação, exclusão, retenção e incidentes
+
+Procedimento interno preparado em 12/10/2026. Não substitui revisão jurídica nem aprova a comercialização. Sem novo serviço, painel de suporte ou sistema de cobrança. Os contatos e o atendimento são os centralizados em server/config.js: WhatsApp oficial e e-mail de suporte/privacidade, segunda a sexta, 8h–18h de Brasília, resposta inicial até dois dias úteis. Prazos legais de conclusão e comunicação não são substituídos por esse prazo de resposta.
+
+## Registro mínimo de cada solicitação
+
+Manter em arquivo restrito do operador: protocolo, tipo de pedido, UUID da conta, datas, operador, referência da verificação de identidade, decisão sobre exportação/retenção e resultado. Não incluir senha, link de recuperação, token, extrato completo, foto de documento ou transcrição integral de conversa. Usar referência ao comprovante já guardado, não duplicar o documento. Definir acesso e prazo de guarda com revisão jurídica. Nunca armazenar atendimento ou provas no GitHub público.
+
+## Verificação da identidade
+
+Não autorizar recuperação/exclusão só com nome, e-mail informado, screenshot ou comprovante de pagamento avulso. O e-mail do cadastro é confirmado automaticamente pelo Supabase e não comprova posse anterior do endereço. Exigir vínculo previamente estabelecido entre a conta (UUID) e um canal que o responsável já verificou, ou prova de controle da própria conta por mecanismo autenticado, corroborada por contato independente previamente conhecido. Revalidar o canal antes de entregar uma recuperação. Não alterar o e-mail da conta para um novo endereço indicado no pedido sem verificação adequada.
+
+Se esse vínculo não existe, houver disputa ou houver inconsistência, interromper a liberação, registrar a pendência e encaminhar ao responsável para verificação proporcional adicional. Não improvisar perguntas sobre valores financeiros como único fator, pedir senhas ou coletar documentos excessivos. A formação desse vínculo na contratação precisa de rotina do responsável; o app não automatiza essa verificação.
+
+## Recuperação administrativa
+
+1. Receber a solicitação no canal oficial, registrar protocolo e verificar identidade como acima. Conferir o UUID e o e-mail já associados à conta, sem editar clientes não envolvidos.
+2. No Supabase Authentication → Users, filtrar o UUID/e-mail exato, conferir o usuário e usar Send password recovery. Confirmar o endereço/destino do ambiente. O cliente abre a mensagem mais recente, escolhe a senha por conta própria e testa o login com o mesmo e-mail da conta; alias e endereço sem alias são contas diferentes.
+3. Não definir nem enviar senha pronta. O link é credencial sensível: não colocá-lo em logs, tickets públicos ou Git. Não solicitar que o cliente envie o link ou senha pelo WhatsApp. Se for usada a API administrativa oficial generateLink no futuro, fazê-lo apenas em ferramenta local protegida, depois da verificação, sem chave administrativa na Vercel, no frontend ou no repositório. Esse caminho por API administrativa não foi habilitado nesta entrega.
+4. O backend suporta token_hash/PKCE e retorno implícito com access_token/refresh_token. Tokens do retorno implícito são verificados pelo Supabase e vinculados à mesma conta e sessão; origem, CSRF e limites permanecem obrigatórios. A recuperação cria sessão temporária de 15 minutos, que não acessa o histórico financeiro. A atualização utiliza Supabase Auth updateUser; a conclusão exige signOut global do provedor, invalidação local e remoção do cookie. Se a revogação falhar, a senha pode já ter sido alterada, mas o app informa que o encerramento não foi confirmado e exige acompanhamento.
+5. Link expirado/usado: pedir novo envio, sem tentar reutilizar credenciais já consumidas. O formulário não pode recarregar a página e perder o callback durante a inicialização. Não validar o mesmo token novamente só porque o redirecionamento demorou.
+
+Validação real realizada com o alias fictício autorizado: mensagem recebida, senha escolhida pelo usuário e login posterior confirmado. O usuário inicialmente tentou entrar com outro e-mail; ao usar o alias correto, o login funcionou. JWT anterior à troca não autorizou leitura financeira. A validação inicial foi realizada no localhost. A publicação e a validação na Vercel devem ser registradas no relatório de execução da homologação. A recuperação pública automática continua desativada pela configuração atual.
+
+## Exclusão administrativa
+
+1. Registrar pedido, UUID, verificação de identidade e confirmação inequívoca de encerramento. Oferecer exportação JSON/CSV quando cabível. A exportação pode conter dados financeiros: entregar somente ao titular verificado, sem arquivo público. Registrar apenas se foi oferecida/concluída/dispensada.
+2. Avaliar obrigações de conservação concretas, disputas ou ordens legais antes de excluir. Retenção não pode ser genérica ou ilimitada. Separar somente o mínimo necessário para finalidade legal, com acesso restrito; não manter todo o histórico financeiro por conveniência. Quando houver impedimento, informar a fundamentação aplicável e os efeitos do encerramento.
+3. Suspender a conta no Supabase Auth para interromper o acesso antes da exclusão. As verificações do banco recusam contas banidas e sessões inexistentes, inclusive para JWT ainda não expirado. Revalidar que outras contas continuam independentes. Para encerramento global via API quando houver acesso administrativo, utilizar signOut oficial e verificar o resultado; não manipular senhas/hashes por SQL.
+4. Conferir arquivos Storage pertencentes ao UUID e eventuais conteúdos de versões antigas. A versão atual não envia imagens/áudio, mas o bucket receipt-private existe e pode conter dados de versões anteriores. Se houver objetos, remover pela API/console Storage conforme a decisão do titular; não presumir que excluir o usuário os elimina. Não apagar objetos de terceiros nem só escolher pelo nome do arquivo.
+5. No painel Authentication → Users, excluir o UUID confirmado pelo mecanismo oficial. A exclusão do usuário aciona vínculos em cascata das tabelas do app. Confirmar ausência do usuário, sessões e registros em profiles, legal_acceptances, user_settings, custom_categories, merchants, ledger_versions, ledger_entries, receipt_items e entitlements; conferir Storage novamente. Contar por UUID, sem consultar históricos alheios.
+6. Tratar sessões locais/Blob, logs, comprovantes e backups conforme retenção aprovada. A remoção do Auth bloqueia acesso; não prova remoção imediata de toda cópia dos fornecedores. Objetos Blob expirados ainda dependem de rotina operacional de limpeza. Preservar marcadores de revogação/locks até ser seguro eliminá-los. Registrar resultado mínimo e comunicar ao titular o escopo/pendências.
+
+Não há autoexclusão nem promessa de apagar backups instantaneamente. Não restaurar uma conta excluída a partir de backup sem motivo legítimo: manter referência mínima ao encerramento e reaplicar as exclusões em eventual restauração, antes de reabrir o acesso.
+
+## Inventário e proposta de retenção — sujeita a aprovação
+
+| Informação | Onde/como fica | Critério proposto, ainda não política aprovada |
+|---|---|---|
+| Histórico financeiro, itens e preferências | PostgreSQL Supabase, por UUID | Enquanto a conta estiver em uso e o dado for necessário; permitir exclusão dos lançamentos e encerramento. Não apagar contas por inatividade sem política/comunicação previamente definidas. |
+| Conta e credenciais | Supabase Auth; representação protegida da senha e sessões do provedor | Enquanto necessário ao acesso; encerrar após pedido verificado, tratando apenas exceções legais identificadas. Prazo indeterminado de acesso não significa retenção perpétua. |
+| Sessões e controles | Blob privado Vercel ou arquivos criptografados no teste local; tokens, expiração, contadores, locks e épocas de revogação | Acesso até 30 dias, recuperação 15 minutos e sessão anônima uma hora, conforme código. Propor limpeza diária de sessões/contadores expirados após teste da rotina; não confundir expiração com exclusão física nem eliminar indiscriminadamente locks/épocas. Rotina hospedada ainda não configurada. |
+| Logs técnicos | Runtime Vercel e logs Auth/banco Supabase | Coletar somente o necessário; consultar retenção efetiva do plano/painel. Exportar evidência mínima restrita apenas quando necessária a incidente. Não definir aqui um prazo fictício do fornecedor. |
+| Backups | Arquivos manuais ou backups gerenciados, conforme plano escolhido | Proposta operacional: backup criptografado diário com sete cópias diárias e quatro semanais, sujeitos à aprovação e capacidade. Isso é proposta própria, não capacidade contratada ou prazo do Supabase. Testar restauração em ambiente isolado; não copiar sessões para produção restaurada. |
+| Contratação e atendimento | Canal/arquivo administrativo escolhido pelo responsável | Guardar prova mínima da oferta, pagamento e atendimento enquanto necessária à relação e às obrigações concretas. Definir período por finalidade com revisão jurídica/contábil; não arquivar todas as conversas para sempre. |
+| Fotos, OCR bruto e áudio | Fluxo de navegador; possíveis serviços de voz e cópias no aparelho | O backend atual não os armazena. Não prometer eliminação da galeria, backups pessoais ou registros do fornecedor de voz. Downloads do OCR/fontes e reconhecimento de voz têm fornecedores auxiliares. |
+| Código | GitHub | Versionar código e migrações, não dados de clientes, links, sessões, segredos ou dumps. |
+
+O Supabase de testes tem RLS ativa e bucket receipt-private não público. A política jurídica permaneceu development/legal_ready=false. Não foram lidos nem alterados registros financeiros de clientes reais nesta auditoria. Backups Supabase não equivalem automaticamente a backup dos arquivos Storage; verificar cobertura e plano efetivos.
+
+## Incidentes e perda de dados
+
+1. Abrir registro restrito com protocolo, horário em que o problema foi percebido, sintomas, ambiente e operador. Distinguir falha operacional, suspeita e incidente confirmado. Não anexar credenciais ou base completa; preservar evidência mínima dos logs antes que expirem.
+2. Conter o problema: interromper operações afetadas, suspender apenas contas envolvidas quando necessário e revogar sessões por mecanismos oficiais. Se um segredo tiver sido comprometido, planejar rotação e encerramento das sessões correspondentes. Não remover RLS/CSRF/HTTPS para restaurar disponibilidade. A execução de contenção em produção exige operador autorizado; não foi realizada em clientes reais nesta entrega.
+3. Verificar extensão: versão/deploy, origem provável, categorias de dados, quantidade de titulares/contas, acesso/leitura/alteração/exclusão e se houve exfiltração. Consultar status dos fornecedores. Não inferir vazamento de uma mera vulnerabilidade nem ausência de incidente só por falta de logs.
+4. Corrigir causa, testar em ambiente isolado e recuperar primeiro em ambiente separado. Validar integridade, UUIDs, políticas, ausência de dados cruzados, sessões e pedidos de exclusão posteriores ao backup. Preservar uma cópia verificável antes de qualquer restauração sobre banco em uso; nunca restaurar por cima dos clientes sem plano e autorização.
+5. O responsável deve avaliar comunicações à ANPD e aos titulares quando houver risco/dano relevante. A orientação oficial prevê, em regra, três dias úteis para comunicação, ressalvadas normas específicas; confirmar marco de contagem, enquadramento e conteúdo com apoio jurídico. Não esperar a resposta comum de suporte ou a investigação completa para avaliar os prazos. Comunicações devem ser claras sobre dados afetados, risco, medidas e contato, sem expor terceiros. Não é suficiente comunicar só à ANPD quando também há obrigação perante titulares.
+6. Registrar decisão/fundamento sobre comunicação, ações, responsáveis e resultados; preservar o registro pelo período legal aplicável. Revisar causa e medidas de prevenção. A restauração local com dados fictícios já passou; restauração hospedada, alertas e rotina de incidentes ainda exigem implementação operacional do responsável.
+
+## Estado da entrega
+
+Correção e testes locais: auth.js, server/auth-service.js, server.js, referência versionada do script em server/pages.js e testes de recuperação. Nenhum texto jurídico foi alterado nesta correção, conforme a instrução posterior do usuário. O envio ao GitHub e a publicação são restritos à homologação autorizada, após revisão e testes; nenhuma flag jurídica ou configuração de produção comercial deve ser alterada. O guia descreve o procedimento e distingue etapas implementadas/testadas de tarefas operacionais pendentes.
+
+## Referências oficiais
+
+[Supabase generateLink](https://supabase.com/docs/reference/javascript/auth-admin-generatelink), [deleteUser](https://supabase.com/docs/reference/javascript/auth-admin-deleteuser), [signOut administrativo](https://supabase.com/docs/reference/javascript/auth-admin-signout), [backups](https://supabase.com/docs/guides/platform/backups), [logs Vercel](https://vercel.com/docs/logs/runtime), [comunicação de incidentes — ANPD](https://www.gov.br/anpd/pt-br/canais_atendimento/agente-de-tratamento/comunicado-de-incidente-de-seguranca-cis). As regras próprias de retenção propostas acima dependem de aprovação; não são afirmações sobre prazos internos dos fornecedores.
+
+Exclusão real concluída com autorização pontual do usuário: somente a conta fictícia aprovada para essa validação. Auth, sessões, nove tabelas e Storage conferidos sem registros; sessões locais da fixture removidas. Duas outras contas fictícias permanecem. Ver testes-operacoes-reais.json.

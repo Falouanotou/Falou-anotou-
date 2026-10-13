@@ -7,6 +7,7 @@ function createVercelHandler({env=process.env,root=path.resolve(__dirname,'..'),
   const started=Date.now();res.once?.('finish',()=>{if(res.statusCode>=500)console.error(JSON.stringify({event:'request_failure',status:res.statusCode,duration_ms:Date.now()-started}));});
   try {
    if(!env.APP_ORIGIN)throw Error('Origem pendente.');
+   if(env.APP_ENV!==undefined&&!['development','production'].includes(env.APP_ENV))throw Error('APP_ENV inválido.');
    const config=configuration({...env,NODE_ENV:env.APP_ENV||'production'},root);
    if(!config.secure||!config.configured)throw Error('Configuração pendente.');
    const sdk=await sdkFactory();

@@ -79,11 +79,29 @@ class AuthService{
     if(type==='recovery'){await this.store.rotate(res,session,data.session,{recovery:Date.now()+900000});return {redirect:'/nova-senha'};}
     await client.auth.signOut({scope:'local'});await this.store.remove(session.id);this.store.setCookie(res,'',0);return {redirect:'/login?notice=confirmed'};
   }
+  async recoverySession(req,res,session,body){
+    this.ready();await this.limited(req,'recovery-session',10);
+    guard(body.type==='recovery'&&typeof body.accessToken==='string'&&body.accessToken.length>0&&body.accessToken.length<=8192&&typeof body.refreshToken==='string'&&body.refreshToken.length>0&&body.refreshToken.length<=2048&&!/\s/.test(body.refreshToken),400,'O link de recuperação está incompleto. Solicite um novo link.');
+    const client=this.client({storage:{}}),original=await client.auth.getUser(body.accessToken);
+    guard(!original.error&&original.data?.user?.id&&original.data.user.email_confirmed_at&&!original.data.user.is_anonymous,400,'O link expirou ou não é válido. Solicite outro.');
+    const renewed=await client.auth.refreshSession({refresh_token:body.refreshToken});
+    guard(!renewed.error&&renewed.data?.session&&renewed.data.user?.id===original.data.user.id,400,'Os dados do link não correspondem à mesma conta. Solicite outro.');
+    const verified=await client.auth.getUser(renewed.data.session.access_token);
+    const sessionId=token=>{try{return JSON.parse(Buffer.from(token.split('.')[1],'base64url')).session_id;}catch{return null;}};
+    const before=sessionId(body.accessToken),after=sessionId(renewed.data.session.access_token);
+    guard(!verified.error&&verified.data?.user?.id===original.data.user.id&&typeof before==='string'&&before===after,400,'A sessão do link não é válida. Solicite outro.');
+    const access=await client.rpc('has_account_access');guard(!access.error&&access.data===true,403,'A recuperação desta conta não está disponível. Procure o suporte.');
+    await this.store.rotate(res,session,renewed.data.session,{recovery:Date.now()+900000});
+    return {redirect:'/nova-senha'};
+  }
   async reset(res,session,body){
     const {client,user}=await this.verified(session);guard(session.recovery>Date.now(),403,'Solicite um novo link de recuperação.');this.password(body.password);guard(body.password===body.confirmPassword,400,'As senhas precisam ser iguais.');
     const {error}=await client.auth.updateUser({password:body.password});guard(!error,400,'Não consegui alterar a senha. Confira as regras do provedor e tente novamente.');
-    try{await client.auth.signOut({scope:'global'});}catch{/* All BFF sessions are invalidated locally regardless. */}
-    await this.store.invalidateUser(user.id);await this.store.remove(session.id);this.store.setCookie(res,'',0);return {redirect:'/login?notice=password-updated'};
+    let revoked=false;
+    try{const result=await client.auth.signOut({scope:'global'});revoked=!result?.error;}catch{/* Report incomplete provider revocation after local invalidation. */}
+    try{await this.store.invalidateUser(user.id);}finally{try{await this.store.remove(session.id);}finally{this.store.setCookie(res,'',0);}}
+    guard(revoked,503,'A senha foi atualizada, mas não consegui confirmar o encerramento de todas as sessões no provedor. Procure o suporte antes de retomar o uso.');
+    return {redirect:'/login?notice=password-updated'};
   }
   async accept(session,body){guard(!this.config.production||this.config.legalReady,403,'Os documentos aguardam liberação.');const {client}=await this.verified(session);guard(!session.recovery,403,'Defina sua senha antes de continuar.');guard(body.accepted===true,400,'Confirme a leitura e o aceite dos documentos.');const {error}=await client.rpc('accept_legal_documents',{p_terms:this.config.termsVersion,p_privacy:this.config.privacyVersion});guard(!error,503,'Não consegui registrar o aceite. Confira a configuração do banco.');return {redirect:'/app'};}
   async logout(res,session){try{if(session?.auth&&this.config.configured){const client=this.client(session);await client.auth.signOut({scope:'local'});}}catch{/* Local BFF session must still end if the provider is unreachable. */}finally{try{await this.store.remove(session?.id);}finally{this.store.setCookie(res,'',0);}}return {redirect:'/login'};}

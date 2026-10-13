@@ -16,12 +16,16 @@ function configuration(env=process.env,root=path.resolve(__dirname,'..')){
   const termsPath=legalPath(env.TERMS_PATH||'/termos-de-uso'),privacyPath=legalPath(env.PRIVACY_PATH||'/politica-de-privacidade');
   if(termsPath===privacyPath)throw Error('Termos e privacidade exigem rotas diferentes.');
   const termsVersion=env.TERMS_VERSION||'minuta-2026-10-12',privacyVersion=env.PRIVACY_VERSION||'minuta-2026-10-12';
-  const company={name:env.COMPANY_NAME||'',document:env.COMPANY_DOCUMENT||'',address:env.COMPANY_ADDRESS||'',email:env.PRIVACY_CONTACT_EMAIL||''};
+  const email=(env.PRIVACY_CONTACT_EMAIL||'Linomaia.ib@gmail.com').trim(),whatsapp=(env.SUPPORT_WHATSAPP||'5588921615825').trim();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||/[<>"'?#]/.test(email))throw Error('E-mail de atendimento inválido.');
+  if(!/^55\d{10,11}$/.test(whatsapp))throw Error('SUPPORT_WHATSAPP deve conter 55, DDD e número, somente dígitos.');
+  const contacts={email,whatsapp,whatsappUrl:'https://wa.me/'+whatsapp,whatsappLabel:whatsapp.replace(/^55(\d{2})(\d{4,5})(\d{4})$/,'($1) $2-$3'),supportHours:'Segunda a sexta-feira, das 8h às 18h, horário de Brasília.',initialResponse:'Até 2 dias úteis.'};
+  const company={name:env.COMPANY_NAME||'',document:env.COMPANY_DOCUMENT||'',address:env.COMPANY_ADDRESS||'',email:contacts.email};
   const legalReady=env.LEGAL_APPROVED==='true'&&env.LEGAL_PUBLISHED==='true'&&Object.values(company).every(v=>v.trim())&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(company.email)&&![termsVersion,privacyVersion].some(v=>/minuta|draft/i.test(v));
   // Legal drafts allow fictional tests, never commercial admission.
   const signupAllowed=!production||legalReady;
   const minPassword=Number(env.PASSWORD_MIN_LENGTH||15),sessionDays=Number(env.SESSION_DAYS||30);
   if(!Number.isInteger(minPassword)||minPassword<15||minPassword>128||!Number.isInteger(sessionDays)||sessionDays<1||sessionDays>30)throw Error('Limites de senha/sessão inválidos.');
-  return {root,port,origin:origin.origin,host:origin.host,secure:origin.protocol==='https:',production,url,key,configured:!!url&&!!key,minPassword,sessionDays,recoveryEnabled:env.PASSWORD_RECOVERY_ENABLED==='true',termsPath,privacyPath,termsVersion,privacyVersion,company,legalReady,signupAllowed,secret:env.SESSION_SECRET||'',runtime:env.AUTH_RUNTIME_DIR||path.join(root,'.runtime')};
+  return {root,port,origin:origin.origin,host:origin.host,secure:origin.protocol==='https:',production,url,key,configured:!!url&&!!key,minPassword,sessionDays,recoveryEnabled:env.PASSWORD_RECOVERY_ENABLED==='true',termsPath,privacyPath,termsVersion,privacyVersion,company,contacts,legalReady,signupAllowed,secret:env.SESSION_SECRET||'',runtime:env.AUTH_RUNTIME_DIR||path.join(root,'.runtime')};
 }
 module.exports={configuration};

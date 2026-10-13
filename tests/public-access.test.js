@@ -13,6 +13,21 @@ test('Cadastro direto e Google ausente; documentos incompletos bloqueiam produç
  assert.equal(prod.signupAllowed,false);await assert.rejects(new AuthService(prod,{}).signup({}, {}, {}, {}),e=>e.status===403);
  assert.equal(typeof AuthService.prototype.google,'undefined');assert.equal(typeof AuthService.prototype.callback,'undefined');
 });
+test('Produção exige identificação completa, aprovação e versões finais dos documentos',()=>{
+ const c=config(),env={NODE_ENV:'production',APP_ORIGIN:'https://fixture.example.invalid',SUPABASE_URL:c.url,SUPABASE_PUBLISHABLE_KEY:c.key,COMPANY_NAME:'Responsável fictício',COMPANY_DOCUMENT:'Identificação fictícia',COMPANY_ADDRESS:'Endereço fictício',PRIVACY_CONTACT_EMAIL:'privacy@example.invalid',TERMS_VERSION:'1.0',PRIVACY_VERSION:'1.0',LEGAL_APPROVED:'true',LEGAL_PUBLISHED:'true'};
+ assert.equal(configuration(env).legalReady,true);
+ assert.equal(configuration(env).signupAllowed,true);
+ for(const change of [{LEGAL_APPROVED:'false'},{LEGAL_PUBLISHED:'false'},{COMPANY_NAME:''},{COMPANY_DOCUMENT:''},{COMPANY_ADDRESS:''},{TERMS_VERSION:'minuta-2026-10-12'},{PRIVACY_VERSION:'draft'}]){
+  const candidate=configuration({...env,...change});assert.equal(candidate.legalReady,false);assert.equal(candidate.signupAllowed,false);
+ }
+ assert.throws(()=>configuration({...env,PRIVACY_CONTACT_EMAIL:'invalid'}),/E-mail de atendimento inválido/);
+});
+test('APP_ENV desconhecido não permite contornar o bloqueio de produção na Vercel',async()=>{
+ let sdkLoaded=false;const c=config();
+ const handler=createVercelHandler({env:{APP_ENV:'prodution',APP_ORIGIN:'https://fixture.example.invalid',SUPABASE_URL:c.url,SUPABASE_PUBLISHABLE_KEY:c.key},sdkFactory(){sdkLoaded=true;}});
+ const res={writeHead(status){this.statusCode=status;},end(body){this.body=body;}};
+ await handler({headers:{}},res);assert.equal(res.statusCode,503);assert.equal(sdkLoaded,false);
+});
 test('Cadastro recebe sessão do provedor fixture, registra aceite e entra imediatamente; não envia e-mail',async()=>{
  let rotated,signupInput;const calls=[];
  const user={id:'fictional-A',email:'a@example.invalid',email_confirmed_at:'2026-10-12'};
