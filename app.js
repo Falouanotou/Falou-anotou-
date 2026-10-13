@@ -301,4 +301,3 @@ document.addEventListener('fa:private-clear',()=>{
     renderAll();setupSpeech();showLegacy();document.body.dataset.accountReady='true';
   }catch{document.body.dataset.accountReady='false';location.replace('/login?notice=setup-required');}
 })();
-if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});

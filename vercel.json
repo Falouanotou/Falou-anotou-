@@ -6,8 +6,24 @@
   "functions": {
     "api/app.js": {
       "maxDuration": 60,
-      "includeFiles": "{index.html,styles.css,auth.css,auth.js,account-api.js,app.js,finance-query.js,receipt-parser.js,receipt-ui.js,icon.svg,manifest.webmanifest,sw.js}"
+      "includeFiles": "{index.html,styles.css,auth.css,auth.js,account-api.js,app.js,finance-query.js,receipt-parser.js,receipt-ui.js,icon.svg,manifest.webmanifest,sw.js,pwa.js,icon-192.png,icon-512.png,icon-maskable-512.png,apple-touch-icon.png}"
     }
   },
-  "rewrites": [{"source": "/(.*)", "destination": "/api/app"}]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/app"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "private, no-store"
+        }
+      ]
+    }
+  ]
 }

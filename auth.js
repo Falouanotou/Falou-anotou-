@@ -26,7 +26,7 @@
     }
     if(mode==='confirm'&&(confirmation.tokenHash||confirmation.code)){navigate(await api('/api/auth/confirm',confirmation));return;}
     if(mode==='confirm')throw Error('Este endereço não contém os dados de recuperação. Abra novamente o link completo da mensagem mais recente, uma única vez.');
-    if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+
     if(['login','signup'].includes(mode)&&state.user&&params.get('notice')!=='setup-required'){location.replace(state.recovery?'/nova-senha':state.needsConsent?'/aceitar-documentos':'/app');return;}
     if(['consent','reset','account'].includes(mode)&&!state.user){location.replace('/login');return;}
     if(['consent','reset'].includes(mode)&&state.user){const subtitle=document.querySelector('.auth-subtitle');subtitle.textContent+=' Conta: '+state.user.email;}

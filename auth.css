@@ -10,3 +10,5 @@ body[data-account-ready=false]>.shell,body[data-account-ready=false]>.review-dia
 .auth-footer{flex-direction:row}.auth-footer>span{display:flex;align-items:center}
 
 .auth-field input{scroll-margin-block:24px}.auth-content{padding-bottom:max(28px,env(safe-area-inset-bottom))}
+
+.pwa-install{margin-top:16px;border-top:1px solid #e7ece5;padding-top:6px}.pwa-install-action{display:block;border:0;background:none;color:#27664c;font:inherit;font-size:13px;min-height:44px;padding:10px 0;text-align:left;touch-action:manipulation;cursor:pointer}.pwa-install-action:focus-visible{outline:2px solid #347451;outline-offset:3px;border-radius:4px}.pwa-instructions{border:1px solid #e7ece5;border-radius:12px;padding:16px;color:#60786b;font-size:13px;line-height:1.65}.pwa-instructions[hidden]{display:none}.pwa-instructions h3{font-size:14px;color:#19382b;margin:0 0 12px}.pwa-instructions ol{padding-left:20px}.pwa-instructions p{margin:12px 0}.pwa-status{color:#60786b;font-size:12px;line-height:1.6}.pwa-status:empty{display:none}
