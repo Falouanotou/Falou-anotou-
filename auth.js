@@ -16,9 +16,9 @@
     if(['consent','reset','account'].includes(mode)&&!state.user){location.replace('/login');return;}
     if(['consent','reset'].includes(mode)&&state.user){const subtitle=document.querySelector('.auth-subtitle');subtitle.textContent+=' Conta: '+state.user.email;}
     const notice={confirmed:'E-mail confirmado. Agora entre com sua conta.','password-updated':'Senha atualizada. Entre com a nova senha.','session-expired':'Sua sessão expirou. Entre novamente.','setup-required':'Não consegui carregar sua conta. Confira a configuração do projeto e tente novamente.'}[params.get('notice')];if(notice)message(notice,['setup-required'].includes(params.get('notice')));
-    if($('authConfiguration')&&(!state.config.configured||mode==='signup'&&!state.config.signupAllowed||state.config.development&&state.config.legalDraft)){
+    if($('authConfiguration')&&(!state.config.configured||mode==='signup'&&!state.config.signupAllowed)){
       const el=$('authConfiguration');el.hidden=false;
-      el.textContent=!state.config.configured?'A conexão de contas ainda não foi configurada. Login e cadastro não estão disponíveis por enquanto.':mode==='signup'&&!state.config.signupAllowed?'O cadastro aguarda a revisão e publicação dos documentos.':'Ambiente de desenvolvimento: documentos em minuta. Use apenas contas fictícias para testar.';
+      el.textContent=!state.config.configured?'A conexão de contas ainda não foi configurada. Login e cadastro não estão disponíveis por enquanto.':'O cadastro aguarda a revisão e publicação dos documentos.';
     }
     $('passwordToggle')?.addEventListener('click',()=>{const input=$('authPassword'),show=input.type==='password';input.type=show?'text':'password';$('passwordToggle').textContent=show?'Ocultar senha':'Mostrar senha';$('passwordToggle').setAttribute('aria-pressed',String(show));});
     $('authForm')?.addEventListener('submit',event=>{
