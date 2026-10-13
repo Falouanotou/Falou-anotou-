@@ -43,7 +43,13 @@ class VercelBlobs {
   }
  }
  async setJSON(key,data,options) {return this.set(key,JSON.stringify(data),options);}
- async delete(key) {await this.sdk.del(this.prefix+key);}
+ async delete(key,options={}) {
+  try {await this.sdk.del(this.prefix+key,options);return {deleted:true};}
+  catch(error) {
+   if(this.sdk.BlobPreconditionFailedError&&error instanceof this.sdk.BlobPreconditionFailedError)return {deleted:false};
+   throw error;
+  }
+ }
  async *list({prefix=''}) {
   let cursor;
   do {

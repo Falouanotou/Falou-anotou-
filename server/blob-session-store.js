@@ -58,10 +58,11 @@ class BlobSessionStore{
   if(!lease)throw unavailable('session_lock_timeout');this.lease=lease;
   try{return await operation();}finally{
    this.lease=null;
-   // Conditional release cannot clear a lock already acquired by another worker.
+   // Delete only the exact lock version acquired by this worker. An expired
+   // lease may already belong to another worker, so a mismatched ETag is safe.
    let etag=lease.etag,released=false;
    for(let attempt=0;attempt<2&&!released;attempt++){
-    try{released=(await this.blobs.setJSON(key,{owner:'',until:0},{onlyIfMatch:etag,metadata:{expires:Date.now()+86400000}})).modified;if(released)break;}catch{/* Retry only while we still own this bounded lease. */}
+    try{released=(await this.blobs.delete(key,{ifMatch:etag})).deleted;if(released)break;}catch{/* Retry only while we still own this bounded lease. */}
     try{const current=await this.blobs.getWithMetadata(key,{type:'json',consistency:'strong'});if(!current||current.data.owner!==owner){released=true;break;}etag=current.etag;}catch{break;}
    }
    if(!released)console.error(JSON.stringify({event:'session_failure',code:'session_lock_release_failed'}));
